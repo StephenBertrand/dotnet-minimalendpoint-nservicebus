@@ -1,0 +1,334 @@
+:root {
+  color-scheme: light;
+  --ink: #1c1915;
+  --muted: #5c564c;
+  --paper: #f4efe6;
+  --card: #fffdf8;
+  --line: #d9d0c3;
+  --accent: #0f6b5c;
+  --accent-ink: #f4efe6;
+  --danger: #8f2d2d;
+  --ok: #1f6b3a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.site-header,
+main,
+.banner {
+  width: min(960px, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.site-header {
+  padding: 2.5rem 0 1.5rem;
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: var(--muted);
+}
+
+h1, h2 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h1 { margin: 0.35rem 0 0.75rem; font-size: 2.1rem; }
+h2 { margin: 0; font-size: 1.15rem; }
+
+.lede {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--muted);
+}
+
+.tabs {
+  width: min(960px, calc(100% - 2rem));
+  margin: 0 auto 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tab {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.tab[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+main {
+  display: grid;
+  padding-bottom: 3rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.15rem 1.2rem 1.25rem;
+  box-shadow: 0 1px 0 rgba(28, 25, 21, 0.04);
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.hero-message {
+  font-size: 1.65rem;
+  margin: 0 0 0.75rem;
+}
+
+.meta {
+  display: flex;
+  gap: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+.meta dt {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.meta dd { margin: 0.15rem 0 0; }
+
+.hero-message,
+.status {
+  min-height: 2.1rem;
+}
+
+.hero-message.idle,
+.status.idle {
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.status { margin: 0 0 0.35rem; font-size: 1.2rem; }
+.status.ok { color: var(--ok); }
+.status.busy { color: var(--accent); }
+.status.error { color: var(--danger); }
+
+.lookup-form { margin-top: 1.25rem; }
+
+.lookup-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.lookup-list li {
+  display: grid;
+  gap: 0.15rem 1rem;
+  grid-template-columns: 1fr auto;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.lookup-list .who { margin: 0; }
+.lookup-list .detail {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+.lookup-list .state {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lookup-list .state.rejected { color: var(--danger); }
+.lookup-list .state.completed { color: var(--ok); }
+
+.call-log,
+.meta-line {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+button {
+  font: inherit;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.08); }
+button.ghost {
+  background: transparent;
+  color: var(--danger);
+  padding-inline: 0.4rem;
+}
+
+.todo-form label {
+  display: block;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.todo-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input[type="text"],
+input[type="email"],
+input:not([type]),
+select {
+  flex: 1;
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  width: 100%;
+}
+
+.enroll-form {
+  display: grid;
+  gap: 0.35rem 0.75rem;
+  grid-template-columns: 7rem 1fr;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.enroll-form label {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.enroll-form button {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 0.35rem;
+}
+
+.toasts {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(22rem, calc(100% - 2rem));
+  z-index: 2;
+}
+
+.toast {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  background: #3a221c;
+  color: #fff8f4;
+  border-radius: 8px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
+.todo-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.todo-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.todo-list li.done span {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.todo-list span { flex: 1; }
+
+.error, .banner {
+  color: var(--danger);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
+.banner {
+  background: #f8e4e0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 2rem;
+}
+
+.empty {
+  color: var(--muted);
+  margin: 1rem 0 0;
+}
+
+@media (max-width: 720px) {
+  .card-head { flex-direction: column; }
+  .enroll-form { grid-template-columns: 1fr; }
+  .enroll-form button { grid-column: 1; }
+}

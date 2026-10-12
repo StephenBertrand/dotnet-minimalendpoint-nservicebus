@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimal endpoints demo</title>
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">dotnet-minimalendpoint-nservicebus</p>
+      <h1>API playground</h1>
+    </div>
+    <p class="lede">This site is a separate Aspire service. It proxies <code>/api/*</code> to the API with service discovery. Enrollment is accepted immediately, then a NServiceBus handler finishes the work offline.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Playground">
+    <button type="button" class="tab" role="tab" id="tab-hello" aria-controls="panel-hello" aria-selected="true" tabindex="0">Hello</button>
+    <button type="button" class="tab" role="tab" id="tab-ping" aria-controls="panel-ping" aria-selected="false" tabindex="-1">Ping</button>
+    <button type="button" class="tab" role="tab" id="tab-enroll" aria-controls="panel-enroll" aria-selected="false" tabindex="-1">Enroll</button>
+    <button type="button" class="tab" role="tab" id="tab-lookup" aria-controls="panel-lookup" aria-selected="false" tabindex="-1">Lookup</button>
+    <button type="button" class="tab" role="tab" id="tab-todos" aria-controls="panel-todos" aria-selected="false" tabindex="-1">Todos</button>
+  </nav>
+
+  <main>
+    <section id="panel-hello" class="card" role="tabpanel" aria-labelledby="tab-hello">
+      <div class="card-head">
+        <h2 id="hello-heading">Hello</h2>
+        <code>GET /api/hello</code>
+      </div>
+      <p id="hello-message" class="hero-message idle">Not called yet</p>
+      <dl class="meta">
+        <div>
+          <dt>Flag</dt>
+          <dd id="hello-flag">—</dd>
+        </div>
+        <div>
+          <dt>Enabled</dt>
+          <dd id="hello-enabled">—</dd>
+        </div>
+        <div>
+          <dt>Last call</dt>
+          <dd id="hello-timing">—</dd>
+        </div>
+      </dl>
+      <p id="hello-log" class="call-log" aria-live="polite">Press Call to GET /api/hello</p>
+      <div class="actions">
+        <button type="button" id="hello-call">Call hello</button>
+        <button type="button" id="hello-reset" class="secondary">Reset</button>
+      </div>
+    </section>
+
+    <section id="panel-ping" class="card" role="tabpanel" aria-labelledby="tab-ping" hidden>
+      <div class="card-head">
+        <h2 id="ping-heading">Ping</h2>
+        <code>GET /api/ping</code>
+      </div>
+      <p id="ping-status" class="status idle">Not called yet</p>
+      <p id="ping-timing" class="meta-line">Last call: —</p>
+      <p id="ping-log" class="call-log" aria-live="polite">Press Call to GET /api/ping</p>
+      <div class="actions">
+        <button type="button" id="ping-call">Call ping</button>
+        <button type="button" id="ping-reset" class="secondary">Reset</button>
+      </div>
+    </section>
+
+    <section id="panel-enroll" class="card" role="tabpanel" aria-labelledby="tab-enroll" hidden>
+      <div class="card-head">
+        <h2 id="enroll-heading">Enrollment</h2>
+        <code>POST /api/enrollments</code>
+      </div>
+      <form id="enroll-form" class="enroll-form">
+        <label for="enroll-name">Name</label>
+        <input id="enroll-name" name="name" type="text" maxlength="100" autocomplete="name">
+
+        <label for="enroll-email">Email</label>
+        <input id="enroll-email" name="email" type="text" maxlength="200" autocomplete="email" placeholder="name@example.com">
+
+        <label for="enroll-program">Program</label>
+        <input id="enroll-program" name="program" type="text" maxlength="100" placeholder="Morning cohort, Evening cohort, or Weekend cohort">
+
+        <label for="enroll-processing">Processing</label>
+        <select id="enroll-processing" name="processing">
+          <option value="immediate">Immediate</option>
+          <option value="delayed">Wait one minute</option>
+        </select>
+
+        <button type="submit" id="enroll-submit">Enroll</button>
+      </form>
+      <p id="enroll-status" class="status idle">Fill in the form and submit. Empty fields are checked by the API.</p>
+      <p id="enroll-log" class="call-log" aria-live="polite"></p>
+      <div class="actions">
+        <button type="button" id="enroll-restart" class="secondary" hidden>Check again</button>
+      </div>
+    </section>
+
+    <section id="panel-lookup" class="card" role="tabpanel" aria-labelledby="tab-lookup" hidden>
+      <div class="card-head">
+        <h2 id="lookup-heading">Lookup</h2>
+        <code>GET /api/enrollments</code>
+      </div>
+      <form id="lookup-form" class="enroll-form lookup-form">
+        <label for="lookup-email">Email</label>
+        <input id="lookup-email" name="email" type="text" maxlength="200" placeholder="Blank shows recent rows">
+        <button type="submit">Look up</button>
+      </form>
+      <p id="lookup-empty" class="empty" hidden>No enrollments found.</p>
+      <ul id="lookup-list" class="lookup-list"></ul>
+    </section>
+
+    <section id="panel-todos" class="card" role="tabpanel" aria-labelledby="tab-todos" hidden>
+      <div class="card-head">
+        <h2 id="todos-heading">Todos</h2>
+        <code>GET POST PUT DELETE /api/todos</code>
+      </div>
+      <form id="todo-form" class="todo-form">
+        <label for="todo-title">Title</label>
+        <div class="todo-row">
+          <input id="todo-title" name="title" maxlength="200" placeholder="Add a todo stored in SQL" required>
+          <button type="submit">Add</button>
+        </div>
+      </form>
+      <p id="todos-error" class="error" hidden></p>
+      <p id="todo-empty" class="empty" hidden>No todos yet. Add one to write a row in SQL.</p>
+      <ul id="todo-list" class="todo-list"></ul>
+    </section>
+  </main>
+
+  <p id="app-error" class="banner" hidden></p>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script src="/js/app.js"></script>
+</body>
+</html>

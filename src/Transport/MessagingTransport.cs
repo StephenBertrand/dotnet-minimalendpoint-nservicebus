@@ -2,7 +2,7 @@ using Azure.Identity;
 using NServiceBus;
 using NServiceBus.Transport;
 
-namespace Enrollment;
+namespace Transport;
 
 public static class MessagingTransport
 {
@@ -32,20 +32,19 @@ public static class MessagingTransport
             return new AzureServiceBusTransport(connectionString, TopicTopology.Default);
         }
 
-        var fullyQualifiedNamespace = connectionString;
+        return new AzureServiceBusTransport(NamespaceName(connectionString), new DefaultAzureCredential(), TopicTopology.Default);
+    }
+
+    static string NamespaceName(string connectionString)
+    {
         const string scheme = "sb://";
-        if (fullyQualifiedNamespace.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
+        if (connectionString.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
         {
-            fullyQualifiedNamespace = fullyQualifiedNamespace[scheme.Length..];
+            connectionString = connectionString[scheme.Length..];
         }
 
-        var slash = fullyQualifiedNamespace.IndexOf('/');
-        if (slash >= 0)
-        {
-            fullyQualifiedNamespace = fullyQualifiedNamespace[..slash];
-        }
-
-        return new AzureServiceBusTransport(fullyQualifiedNamespace, new DefaultAzureCredential(), TopicTopology.Default);
+        var slash = connectionString.IndexOf('/');
+        return slash >= 0 ? connectionString[..slash] : connectionString;
     }
 
     // NServiceBus only moves emulator administration to port 5300 when the endpoint has no port.

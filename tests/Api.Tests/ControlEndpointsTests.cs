@@ -55,7 +55,7 @@ public class ControlEndpointsTests
         using var failures = JsonDocument.Parse("""
             [{
               "id": "fa61288a-e8a1-ca96-f842-619e53a5d6a5",
-              "message_type": "Enrollment.EnrollStudentCommand",
+              "message_type": "Messages.EnrollStudentCommand",
               "status": "archived",
               "number_of_processing_attempts": 1,
               "time_of_failure": "2026-10-12T22:57:54Z",
@@ -70,7 +70,7 @@ public class ControlEndpointsTests
               "unique_message_id": "fa61288a-e8a1-ca96-f842-619e53a5d6a5",
               "status": "archived",
               "processing_attempts": [{
-                "message_metadata": { "MessageType": "Enrollment.EnrollStudentCommand", "ContentType": "application/json", "BodyUrl": "/messages/fa61288a-e8a1-ca96-f842-619e53a5d6a5/body" },
+                "message_metadata": { "MessageType": "Messages.EnrollStudentCommand", "ContentType": "application/json", "BodyUrl": "/messages/fa61288a-e8a1-ca96-f842-619e53a5d6a5/body" },
                 "failure_details": {
                   "address_of_failing_endpoint": "Enrollment",
                   "time_of_failure": "2026-10-12T22:57:54Z",

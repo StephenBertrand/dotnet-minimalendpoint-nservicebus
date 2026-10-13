@@ -57,57 +57,72 @@ public sealed class ServiceControlRoom(IHttpClientFactory httpClientFactory, ICo
 
         try
         {
-            var client = httpClientFactory.CreateClient(ErrorClient);
-            var root = GetAsync(client, "/api", cancellationToken);
-            var heartbeats = GetAsync(client, "/api/heartbeats/stats", cancellationToken);
-            var endpoints = GetAsync(client, "/api/endpoints", cancellationToken);
-            var unresolved = GetCountAsync(client, "/api/errors?status=unresolved&page=1&per_page=1", cancellationToken);
-            var checks = GetAsync(client, "/api/customchecks", cancellationToken);
-            var events = GetAsync(client, "/api/eventlogitems", cancellationToken);
-            await Task.WhenAll(root, heartbeats, endpoints, unresolved, checks, events);
-
-            using var rootDocument = root.Result;
-            using var heartbeatDocument = heartbeats.Result;
-            using var endpointDocument = endpoints.Result;
-            using var checkDocument = checks.Result;
-            using var eventDocument = events.Result;
-
-            var snapshot = ControlReader.ReadSnapshot(
-                License(rootDocument),
-                heartbeatDocument?.RootElement ?? default,
-                unresolved.Result,
-                checkDocument?.RootElement ?? default,
-                eventDocument?.RootElement ?? default);
-
-            var rows = ControlReader.ReadEndpoints(endpointDocument?.RootElement ?? default);
-            if (rows.Length > 0)
-            {
-                snapshot = snapshot with
-                {
-                    Endpoints = rows,
-                    HeartbeatsActive = rows.Count(row => row.Status == "beating"),
-                    HeartbeatsFailing = rows.Count(row => row.Status is "dead" or "down")
-                };
-            }
-
-            if (!MonitoringConfigured)
-            {
-                return snapshot;
-            }
-
-            var reading = await ReadMonitoringAsync(1, cancellationToken);
-            return snapshot with
-            {
-                Monitoring = reading.State,
-                MonitoringNote = reading.Note,
-                QueueLength = reading.QueueLength,
-                Activity = reading.Activity
-            };
+            var snapshot = await ReadErrorInstanceAsync(cancellationToken);
+            return MonitoringConfigured
+                ? await WithMonitoringAsync(snapshot, historyMinutes: 1, cancellationToken)
+                : snapshot;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested && IsLinkDown(exception))
         {
             return ControlReader.Empty("down", "ServiceControl did not answer.");
         }
+    }
+
+    async Task<ControlSnapshot> ReadErrorInstanceAsync(CancellationToken cancellationToken)
+    {
+        var client = httpClientFactory.CreateClient(ErrorClient);
+        var root = GetAsync(client, "/api", cancellationToken);
+        var heartbeats = GetAsync(client, "/api/heartbeats/stats", cancellationToken);
+        var endpoints = GetAsync(client, "/api/endpoints", cancellationToken);
+        var unresolved = GetCountAsync(client, "/api/errors?status=unresolved&page=1&per_page=1", cancellationToken);
+        var checks = GetAsync(client, "/api/customchecks", cancellationToken);
+        var events = GetAsync(client, "/api/eventlogitems", cancellationToken);
+        await Task.WhenAll(root, heartbeats, endpoints, unresolved, checks, events);
+
+        using var rootDocument = root.Result;
+        using var heartbeatDocument = heartbeats.Result;
+        using var endpointDocument = endpoints.Result;
+        using var checkDocument = checks.Result;
+        using var eventDocument = events.Result;
+
+        var snapshot = ControlReader.ReadSnapshot(
+            License(rootDocument),
+            heartbeatDocument?.RootElement ?? default,
+            unresolved.Result,
+            checkDocument?.RootElement ?? default,
+            eventDocument?.RootElement ?? default);
+
+        return WithEndpointRows(snapshot, ControlReader.ReadEndpoints(endpointDocument?.RootElement ?? default));
+    }
+
+    static ControlSnapshot WithEndpointRows(ControlSnapshot snapshot, ControlEndpoint[] rows)
+    {
+        if (rows.Length == 0)
+        {
+            return snapshot;
+        }
+
+        return snapshot with
+        {
+            Endpoints = rows,
+            HeartbeatsActive = rows.Count(row => row.Status == "beating"),
+            HeartbeatsFailing = rows.Count(row => row.Status is "dead" or "down")
+        };
+    }
+
+    async Task<ControlSnapshot> WithMonitoringAsync(
+        ControlSnapshot snapshot,
+        int historyMinutes,
+        CancellationToken cancellationToken)
+    {
+        var reading = await ReadMonitoringAsync(historyMinutes, cancellationToken);
+        return snapshot with
+        {
+            Monitoring = reading.State,
+            MonitoringNote = reading.Note,
+            QueueLength = reading.QueueLength,
+            Activity = reading.Activity
+        };
     }
 
     public async Task<ActivityPage> ActivityAsync(int history, CancellationToken cancellationToken)

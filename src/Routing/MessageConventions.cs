@@ -1,4 +1,4 @@
-namespace Enrollment;
+namespace Routing;
 
 public static class MessageConventions
 {

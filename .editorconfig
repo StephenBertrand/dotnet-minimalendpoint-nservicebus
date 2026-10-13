@@ -1,0 +1,7 @@
+root = true
+
+[*.cs]
+dotnet_diagnostic.NSB0022.severity = error
+
+[src/Messages/**.cs]
+dotnet_diagnostic.IDE0130.severity = none

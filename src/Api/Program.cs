@@ -2,7 +2,7 @@ using Api.Features.Control;
 using Api.Features.Enrollments;
 using Api.Features.Processing;
 using Api.Hosting;
-using Enrollment;
+using Endpoint.Extensions;
 using FluentValidation;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.Extensions.Hosting;
@@ -13,9 +13,8 @@ builder.AddServiceDefaults();
 builder.AddDemoAzureAppConfiguration();
 builder.AddProcessingSwitch();
 builder.AddTodosDatabase();
-builder.AddEnrollmentStore();
-builder.AddOrderStore();
-builder.AddEnrollmentMessaging();
+builder.AddFeatureStorage(typeof(Program).Assembly);
+builder.AddApiMessaging();
 builder.AddControlRoom();
 builder.Services.AddValidatorsFromAssemblyContaining<EnrollRequestValidator>();
 builder.Services.AddOpenApi();
@@ -24,8 +23,7 @@ builder.Services.AddFeatureEndpoints(typeof(Program).Assembly);
 var app = builder.Build();
 
 await app.ApplyTodosSchemaAsync();
-await app.ApplyEnrollmentSchemaAsync();
-await app.ApplyOrderSchemaAsync();
+await app.PrepareFeatureStorageAsync(typeof(Program).Assembly);
 
 app.MapDefaultEndpoints();
 

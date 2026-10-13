@@ -1,15 +1,19 @@
 using Api.Features.Enrollments;
 using Enrollment;
+using Messages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NServiceBus;
+using Transport;
 
 namespace Api.Hosting;
 
-public static class EnrollmentMessaging
+public static class ApiMessaging
 {
-    public static TBuilder AddEnrollmentMessaging<TBuilder>(this TBuilder builder)
+    public const string EndpointName = "Api";
+
+    public static TBuilder AddApiMessaging<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
         var connectionString = builder.Configuration.GetConnectionString(MessagingTransport.ConnectionName);
@@ -19,23 +23,11 @@ public static class EnrollmentMessaging
             return builder;
         }
 
-        var endpoint = new EndpointConfiguration("Api");
+        var endpoint = new EndpointConfiguration(EndpointName);
         endpoint.SendOnly();
-        endpoint.EnableInstallers();
-        endpoint.UseSerialization<SystemJsonSerializer>();
-        var conventions = endpoint.Conventions();
-        conventions.DefiningCommandsAs(MessageConventions.IsCommand);
-        conventions.DefiningEventsAs(MessageConventions.IsEvent);
-
-        var transport = MessagingTransport.Create(connectionString);
-        transport.TransportTransactionMode = TransportTransactionMode.ReceiveOnly;
-        var routing = endpoint.UseTransport(transport);
-        routing.RouteToEndpoint(typeof(EnrollStudentCommand), QueueGate.EnrollmentEndpoint);
-        endpoint.SendFailedMessagesTo(ServicePlatformQueues.Error);
+        endpoint.ConfigureReceiveOnlyEndpoint(connectionString);
         endpoint.SendHeartbeatTo(ServicePlatformQueues.Heartbeats);
-
         builder.Services.AddNServiceBusEndpoint(endpoint);
-
         builder.Services.AddSingleton<IEnrollmentSender, NServiceBusEnrollmentSender>();
         return builder;
     }

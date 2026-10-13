@@ -8,6 +8,8 @@ namespace Api.Features.Orders;
 
 public sealed class OrdersEndpoints : IEndpoint
 {
+    const int PageSize = 50;
+
     public void Map(IEndpointRouteBuilder app)
     {
         app.MapGet("/orders", ListAsync).WithTags("Orders").WithName("ListOrders");
@@ -17,7 +19,7 @@ public sealed class OrdersEndpoints : IEndpoint
     {
         var rows = await db.Orders.AsNoTracking()
             .OrderByDescending(row => row.CreatedUtc)
-            .Take(50)
+            .Take(PageSize)
             .ToListAsync(cancellationToken);
 
         return Results.Ok(rows.Select(row => new OrderResponse(

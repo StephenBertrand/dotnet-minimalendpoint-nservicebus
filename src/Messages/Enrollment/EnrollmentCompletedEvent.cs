@@ -1,6 +1,6 @@
-namespace Enrollment;
+namespace Messages;
 
-public sealed class EnrollStudentCommand
+public sealed class EnrollmentCompletedEvent
 {
     public Guid TrackingId { get; set; }
 

@@ -1,4 +1,4 @@
-using Enrollment;
+using Endpoint.Extensions;
 using EnrollmentEndpoint;
 using Microsoft.Extensions.Hosting;
 
@@ -6,13 +6,10 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddDemoAzureAppConfiguration();
-builder.AddEnrollmentStore();
-builder.AddOrderStore();
-builder.AddEnrollmentProcessingEndpoints();
+builder.AddWorkerEndpoints();
 
 var app = builder.Build();
 
-await app.ApplyEnrollmentSchemaAsync();
-await app.ApplyOrderSchemaAsync();
+await app.PrepareFeatureStorageAsync(typeof(WorkerEndpoints).Assembly);
 
 app.Run();

@@ -9,7 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Endpoint.Extensions\Endpoint.Extensions.csproj" />
     <ProjectReference Include="..\Enrollment\Enrollment.csproj" />
+    <ProjectReference Include="..\Orders\Orders.csproj" />
+    <ProjectReference Include="..\Transport\Transport.csproj" />
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 

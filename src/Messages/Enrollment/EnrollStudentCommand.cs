@@ -1,6 +1,9 @@
-namespace Enrollment;
+using Routing;
 
-public sealed class EnrollmentCompletedEvent
+namespace Messages;
+
+[RouteTo("Enrollment")]
+public sealed class EnrollStudentCommand
 {
     public Guid TrackingId { get; set; }
 

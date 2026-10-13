@@ -2,9 +2,14 @@
   <Folder Name="/src/">
     <Project Path="src/Api/Api.csproj" />
     <Project Path="src/AppHost/AppHost.csproj" />
+    <Project Path="src/Endpoint.Extensions/Endpoint.Extensions.csproj" />
     <Project Path="src/Endpoint/Endpoint.csproj" />
     <Project Path="src/Enrollment/Enrollment.csproj" />
+    <Project Path="src/Messages/Messages.csproj" />
+    <Project Path="src/Orders/Orders.csproj" />
+    <Project Path="src/Routing/Routing.csproj" />
     <Project Path="src/ServiceDefaults/ServiceDefaults.csproj" />
+    <Project Path="src/Transport/Transport.csproj" />
     <Project Path="src/Web/Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

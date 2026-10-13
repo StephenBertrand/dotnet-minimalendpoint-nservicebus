@@ -1,5 +1,6 @@
 using Api.Hosting;
 using Enrollment;
+using Messages;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -9,6 +10,8 @@ namespace Api.Features.Enrollments;
 
 public sealed class EnrollmentsEndpoints : IEndpoint
 {
+    const int PageSize = 50;
+
     public void Map(IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/enrollments").WithTags("Enrollments");
@@ -26,13 +29,7 @@ public sealed class EnrollmentsEndpoints : IEndpoint
         var validation = await validator.ValidateAsync(request, cancellationToken);
         if (!validation.IsValid)
         {
-            var errors = validation.Errors
-                .GroupBy(error => ToCamelCase(error.PropertyName))
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.Select(error => error.ErrorMessage).ToArray());
-
-            return Results.ValidationProblem(errors);
+            return Results.ValidationProblem(Errors(validation));
         }
 
         var trackingId = Guid.NewGuid();
@@ -77,7 +74,7 @@ public sealed class EnrollmentsEndpoints : IEndpoint
 
         var rows = await query
             .OrderByDescending(row => row.CreatedUtc)
-            .Take(50)
+            .Take(PageSize)
             .ToListAsync(cancellationToken);
 
         return Results.Ok(rows.Select(ToResponse).ToArray());
@@ -85,6 +82,13 @@ public sealed class EnrollmentsEndpoints : IEndpoint
 
     private static EnrollmentStatusResponse ToResponse(EnrollmentRecord row) =>
         new(row.TrackingId, row.Status, row.Name, row.Email, row.Program, row.Message);
+
+    private static Dictionary<string, string[]> Errors(FluentValidation.Results.ValidationResult validation) =>
+        validation.Errors
+            .GroupBy(error => ToCamelCase(error.PropertyName))
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(error => error.ErrorMessage).ToArray());
 
     private static string ToCamelCase(string propertyName)
     {

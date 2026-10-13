@@ -17,7 +17,7 @@ The API validates the form, returns **202 Accepted** with a tracking id, and sen
 | `web` `/api/*` | YARP forwarder to `api` |
 | `api` `GET /hello`, `GET /ping`, `/todos` | Same as the SQL sample |
 | `api` `POST /enrollments` | FluentValidation. Failures are `400` `application/problem+json`. Success is `202` with `{ trackingId }` and a `Location` header. |
-| `api` `GET /enrollments/{trackingId}` | `404` until the handler has written the row, then `200` with `inprogress`, `completed`, or `rejected` |
+| `api` `GET /enrollments/{trackingId}` | `404` until the handler has written the row, then `200` with `completed` or `rejected` |
 | `api` `GET /orders` | Welcome orders written by the `Orders` endpoint |
 | `api` `GET` / `PUT /processing` | Queue gates for each endpoint and each handler: `running`, `pause`, or `error` |
 | `endpoint` | Two NServiceBus endpoints in one process: `Enrollment` and `Orders` |
@@ -35,9 +35,9 @@ The form field `processing` is `immediate` or `delayed`. Delayed messages use `D
 - NServiceBus starts only when `ConnectionStrings:messaging` is present. Unit tests use the in-memory databases and a fake sender.
 - Welcome orders stay in SQL on the `orders` connection. The order handler is idempotent on the enrollment tracking id.
 
-The handler commits outside the transport transaction (`TransactionScopeOption.Suppress` and a new `DbContext`). The first commit inserts `inprogress`. The second updates that row to `completed`. A poll can see `404`, then `inprogress`, then `completed`. On the immediate path those two commits are back to back, so the page usually goes from `404` to `completed`. The one-minute delay is what makes the wait visible.
+The handler writes the row once, as `completed` or `rejected`. The host is `ReceiveOnly` and has no outbox, so that save is already visible to a poll. There is no `inprogress` step. A poll sees `404`, then the finished status. The one-minute delay is what makes the wait visible.
 
-A second delivery of the same tracking id is safe. A completed row is left as it is.
+A second delivery of the same tracking id is safe. A completed row stays completed and the completion event is published again. A rejected row stays rejected. A different tracking id for an email that is already completed is stored as `rejected` with "An enrollment for this email already exists." The filtered unique index `IX_Enrollments_CompletedEmail` still stops two completed rows for one email.
 
 ## Queue gates
 
@@ -90,7 +90,7 @@ To hold or flush a command, open the playground **Processing** tab. Pause applie
 2. Implement `IEndpoint`
 3. `AddFeatureEndpoints` registers it
 
-Enrollment messages, the entity, and `EnrollmentsDbContext` live in `src/Enrollment` so the API and the endpoint share them. The handler stays in `src/Endpoint`.
+`src/Messages` is only the message types, namespace `Messages`, whatever folder holds the file. `[RouteTo]` comes from `src/Routing`. An event has no route. `src/Endpoint.Extensions` holds feature registration, handler logging, and the queue gate. `src/Enrollment` and `src/Orders` are the feature assemblies. Each has an `IFeatureHandlers` marker, and the endpoint host calls it. Handler classes use `[Handler]` and a `Handle` method. The enrollment database stays in `src/Enrollment`. The orders database stays in `src/Orders`. `src/Endpoint` hosts both queues. `src/Transport` picks RabbitMQ or Azure Service Bus.
 
 ## Tests
 
@@ -105,7 +105,7 @@ Hello, Ping, and Enrollment HTTP tests use `WebApplicationFactory`. They do not 
 ```bash
 dotnet tool restore
 dotnet ef migrations add <Name> --project src/Enrollment --startup-project src/Enrollment --context EnrollmentsDbContext --output-dir Migrations
-dotnet ef migrations add <Name> --project src/Enrollment --startup-project src/Enrollment --context OrdersDbContext --output-dir Orders/Migrations
+dotnet ef migrations add <Name> --project src/Orders --startup-project src/Orders --context OrdersDbContext --output-dir Migrations
 ```
 
 Todos migrations stay in `src/Api`:

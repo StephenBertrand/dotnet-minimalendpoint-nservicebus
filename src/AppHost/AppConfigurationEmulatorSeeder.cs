@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
+using Endpoint.Extensions;
 
 internal static class AppConfigurationEmulatorSeeder
 {
@@ -9,16 +10,6 @@ internal static class AppConfigurationEmulatorSeeder
     private const string FeatureFlagContentType = "application/vnd.microsoft.appconfig.ff+json;charset=utf-8";
     private const string HelloNewWorldFlag = "HelloNewWorld";
     private const string SentinelKey = "Demo:Sentinel";
-
-    // Same keys as Enrollment.QueueGate. Seeded only when missing, so a pause survives a restart.
-    private static readonly string[] ProcessingKeys =
-    [
-        "Demo:Processing:Enrollment",
-        "Demo:Processing:Enrollment:EnrollStudentCommand",
-        "Demo:Processing:Orders",
-        "Demo:Processing:Orders:EnrollmentCompletedEvent",
-        "Demo:Processing:Orders:CreateWelcomeOrderCommand"
-    ];
 
     public static async Task SeedIfMissingAsync(AzureAppConfigurationResource resource, CancellationToken cancellationToken)
     {
@@ -42,7 +33,7 @@ internal static class AppConfigurationEmulatorSeeder
             """{"id":"HelloNewWorld","description":"When enabled, GET /hello returns Hello New World.","enabled":false,"conditions":{"client_filters":[]}}""",
             cancellationToken);
 
-        foreach (var key in ProcessingKeys)
+        foreach (var key in QueueGate.Keys())
         {
             await PutIfMissingAsync(client, key, contentType: null, value: "running", cancellationToken);
         }

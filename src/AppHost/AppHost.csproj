@@ -1,6 +1,7 @@
 <Project Sdk="Aspire.AppHost.Sdk/13.5.3">
 
   <ItemGroup>
+    <ProjectReference Include="..\Endpoint.Extensions\Endpoint.Extensions.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\Api\Api.csproj" />
     <ProjectReference Include="..\Endpoint\Endpoint.csproj" />
     <ProjectReference Include="..\Web\Web.csproj" />

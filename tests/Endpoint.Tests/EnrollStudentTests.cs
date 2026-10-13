@@ -1,31 +1,28 @@
 using Enrollment;
-using EnrollmentEndpoint;
+using Enrollment.EnrollStudent;
+using Messages;
 using Microsoft.EntityFrameworkCore;
 
 namespace Endpoint.Tests;
 
-public sealed class EnrollmentProcessorTests
+public sealed class EnrollStudentTests
 {
     [Fact]
     public async Task Process_SavesACompletedRow()
     {
-        var databaseName = Guid.NewGuid().ToString();
-        var options = new DbContextOptionsBuilder<EnrollmentsDbContext>()
-            .UseInMemoryDatabase(databaseName)
-            .Options;
-        var processor = new EnrollmentProcessor(options);
+        await using var db = NewDatabase();
+        var enroll = NewEnroll(db);
         var trackingId = Guid.NewGuid();
-        var message = new EnrollStudentCommand
+
+        var outcome = await enroll.ProcessAsync(new EnrollStudentCommand
         {
             TrackingId = trackingId,
             Name = "Ada Lovelace",
             Email = "ada@example.com",
             Program = "Morning cohort"
-        };
+        }, CancellationToken.None);
 
-        await processor.ProcessAsync(message, CancellationToken.None);
-
-        await using var db = new EnrollmentsDbContext(options);
+        Assert.Equal(EnrollmentOutcome.Completed, outcome);
         var row = await db.Enrollments.SingleAsync();
         Assert.Equal(trackingId, row.TrackingId);
         Assert.Equal(EnrollmentStatus.Completed, row.Status);
@@ -34,12 +31,10 @@ public sealed class EnrollmentProcessorTests
     }
 
     [Fact]
-    public async Task Process_WhenAlreadyCompleted_DoesNotAddAnotherRow()
+    public async Task Process_WhenAlreadyCompleted_ReturnsCompletedWithoutAnotherRow()
     {
-        var options = new DbContextOptionsBuilder<EnrollmentsDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        var processor = new EnrollmentProcessor(options);
+        await using var db = NewDatabase();
+        var enroll = NewEnroll(db);
         var message = new EnrollStudentCommand
         {
             TrackingId = Guid.NewGuid(),
@@ -48,21 +43,22 @@ public sealed class EnrollmentProcessorTests
             Program = "Evening cohort"
         };
 
-        await processor.ProcessAsync(message, CancellationToken.None);
-        await processor.ProcessAsync(message, CancellationToken.None);
+        await enroll.ProcessAsync(message, CancellationToken.None);
+        var completedAt = (await db.Enrollments.SingleAsync()).CompletedUtc;
 
-        await using var db = new EnrollmentsDbContext(options);
-        Assert.Equal(1, await db.Enrollments.CountAsync());
+        var outcome = await enroll.ProcessAsync(message, CancellationToken.None);
+
+        Assert.Equal(EnrollmentOutcome.Completed, outcome);
+        var row = await db.Enrollments.SingleAsync();
+        Assert.Equal(completedAt, row.CompletedUtc);
     }
 
     [Fact]
     public async Task Process_WhenEmailIsAlreadyEnrolled_RejectsTheNewTrackingId()
     {
-        var options = new DbContextOptionsBuilder<EnrollmentsDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        var processor = new EnrollmentProcessor(options);
-        await processor.ProcessAsync(new EnrollStudentCommand
+        await using var db = NewDatabase();
+        var enroll = NewEnroll(db);
+        await enroll.ProcessAsync(new EnrollStudentCommand
         {
             TrackingId = Guid.NewGuid(),
             Name = "Ada Lovelace",
@@ -71,7 +67,7 @@ public sealed class EnrollmentProcessorTests
         }, CancellationToken.None);
 
         var duplicateId = Guid.NewGuid();
-        await processor.ProcessAsync(new EnrollStudentCommand
+        var outcome = await enroll.ProcessAsync(new EnrollStudentCommand
         {
             TrackingId = duplicateId,
             Name = "Ada Lovelace",
@@ -79,10 +75,20 @@ public sealed class EnrollmentProcessorTests
             Program = "Evening cohort"
         }, CancellationToken.None);
 
-        await using var db = new EnrollmentsDbContext(options);
+        Assert.Equal(EnrollmentOutcome.Rejected, outcome);
         var duplicate = await db.Enrollments.SingleAsync(row => row.TrackingId == duplicateId);
         Assert.Equal(EnrollmentStatus.Rejected, duplicate.Status);
         Assert.Equal(EnrollmentStatus.DuplicateEmailMessage, duplicate.Message);
         Assert.Equal(1, await db.Enrollments.CountAsync(row => row.Status == EnrollmentStatus.Completed));
     }
+
+    static EnrollmentsDbContext NewDatabase()
+    {
+        var options = new DbContextOptionsBuilder<EnrollmentsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        return new EnrollmentsDbContext(options);
+    }
+
+    static EnrollStudent NewEnroll(EnrollmentsDbContext db) => new(db);
 }

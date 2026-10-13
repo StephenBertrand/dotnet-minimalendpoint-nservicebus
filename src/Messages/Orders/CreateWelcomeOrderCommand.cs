@@ -1,5 +1,8 @@
-namespace Enrollment;
+using Routing;
 
+namespace Messages;
+
+[RouteTo("Orders")]
 public sealed class CreateWelcomeOrderCommand
 {
     public Guid TrackingId { get; set; }

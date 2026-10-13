@@ -1,19 +1,16 @@
-using System.Transactions;
 using Enrollment;
+using Messages;
 using Microsoft.EntityFrameworkCore;
 
-namespace EnrollmentEndpoint;
+namespace Orders.CreateWelcomeOrder;
 
-public sealed class OrderProcessor(DbContextOptions<OrdersDbContext> options)
+public sealed class CreateWelcomeOrder(OrdersDbContext db)
 {
-    public async Task CreateWelcomeOrderAsync(CreateWelcomeOrderCommand message, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(CreateWelcomeOrderCommand message, CancellationToken cancellationToken)
     {
-        using var suppress = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
-        await using var db = new OrdersDbContext(options);
         var exists = await db.Orders.AnyAsync(row => row.TrackingId == message.TrackingId, cancellationToken);
         if (exists)
         {
-            suppress.Complete();
             return;
         }
 
@@ -27,6 +24,5 @@ public sealed class OrderProcessor(DbContextOptions<OrdersDbContext> options)
             CreatedUtc = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(cancellationToken);
-        suppress.Complete();
     }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Api.Features.Enrollments;
 using Enrollment;
+using Messages;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;

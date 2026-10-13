@@ -1,4 +1,4 @@
-using Enrollment;
+using Endpoint.Extensions;
 using Microsoft.Extensions.Configuration;
 using NServiceBus;
 using NServiceBus.Pipeline;

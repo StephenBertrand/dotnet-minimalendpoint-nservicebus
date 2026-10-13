@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
+using Routing;
 
-namespace Enrollment;
+namespace Endpoint.Extensions;
 
 public static class QueueGate
 {
@@ -28,6 +29,21 @@ public static class QueueGate
     public static string EndpointKey(string endpoint) => KeyPrefix + endpoint;
 
     public static string HandlerKey(string endpoint, string message) => $"{KeyPrefix}{endpoint}:{message}";
+
+    public static string Key(string endpoint, string? message) =>
+        message is null ? EndpointKey(endpoint) : HandlerKey(endpoint, message);
+
+    public static IEnumerable<string> Keys()
+    {
+        foreach (var endpoint in Endpoints)
+        {
+            yield return EndpointKey(endpoint.Name);
+            foreach (var handler in endpoint.Handlers)
+            {
+                yield return HandlerKey(endpoint.Name, handler.Message);
+            }
+        }
+    }
 
     public static string Normalize(string? value) =>
         value?.Trim().ToLowerInvariant() switch

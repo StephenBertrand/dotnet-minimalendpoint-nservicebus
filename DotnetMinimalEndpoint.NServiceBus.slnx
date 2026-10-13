@@ -4,6 +4,7 @@
     <Project Path="src/AppHost/AppHost.csproj" />
     <Project Path="src/Endpoint.Extensions/Endpoint.Extensions.csproj" />
     <Project Path="src/Endpoint/Endpoint.csproj" />
+    <Project Path="src/Flight/Flight.csproj" />
     <Project Path="src/Enrollment/Enrollment.csproj" />
     <Project Path="src/Messages/Messages.csproj" />
     <Project Path="src/Orders/Orders.csproj" />

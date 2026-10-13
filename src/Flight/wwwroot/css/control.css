@@ -196,6 +196,29 @@ button.meter {
 
 .plot-face svg { display: block; width: 100%; height: 100%; transform: scaleY(-1); }
 
+.plot-readout { position: absolute; inset: 0; pointer-events: none; }
+
+.plot-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(213, 231, 240, 0.85);
+}
+
+.plot-tip {
+  position: absolute;
+  top: 0.28rem;
+  padding: 0.1rem 0.35rem;
+  background: #041016;
+  border: 1px solid var(--line);
+  color: var(--cyan);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .plot-fill { opacity: 0.55; }
 .plot-line, .plot-avg { fill: none; }
 .plot-line { stroke-width: 1.75; }

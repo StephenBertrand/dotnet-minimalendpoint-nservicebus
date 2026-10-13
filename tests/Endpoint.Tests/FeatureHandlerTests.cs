@@ -1,4 +1,5 @@
 using Endpoint.Extensions;
+using EnrollmentEndpoint;
 using Messages;
 using Routing;
 using NServiceBus;
@@ -30,6 +31,22 @@ public sealed class FeatureHandlerTests
         Assert.Contains(orders, binding => binding.Handler == typeof(Orders.CreateWelcomeOrder.CreateWelcomeOrderCommandHandler) && binding.Destination == "Orders");
         Assert.Empty(FeatureHandlers.In(typeof(Enrollment.Shared.AutoConfigureServices)));
         Assert.Empty(FeatureHandlers.In(typeof(Orders.Shared.AutoConfigureServices)));
+    }
+
+    [Fact]
+    public void Discover_loads_feature_projects_the_compiler_left_unnamed()
+    {
+        var referenced = typeof(WorkerEndpoints).Assembly.GetReferencedAssemblies().Select(name => name.Name);
+
+        Assert.DoesNotContain("Enrollment", referenced);
+        Assert.DoesNotContain("Orders", referenced);
+
+        var features = FeatureModules.Discover(typeof(WorkerEndpoints).Assembly).Select(feature => feature.GetType()).ToArray();
+
+        Assert.Contains(typeof(Enrollment.EnrollStudent.AutoConfigureServices), features);
+        Assert.Contains(typeof(Enrollment.Shared.AutoConfigureServices), features);
+        Assert.Contains(typeof(Orders.CreateWelcomeOrder.AutoConfigureServices), features);
+        Assert.Contains(typeof(Orders.Shared.AutoConfigureServices), features);
     }
 
     [Fact]

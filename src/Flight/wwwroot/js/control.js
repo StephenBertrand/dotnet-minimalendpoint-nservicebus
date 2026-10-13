@@ -79,11 +79,70 @@ function plotPaths(trace, minimum) {
 }
 
 function plotSvg(paths) {
-  return `<div class="plot-face"><svg viewBox="0 0 100 ${paths.maxY}" preserveAspectRatio="none" aria-hidden="true">
-    <path class="plot-fill" d="${paths.area}"></path>
-    <path class="plot-line" d="${paths.line}" vector-effect="non-scaling-stroke"></path>
-    <path class="plot-avg" d="${paths.averageLine}" vector-effect="non-scaling-stroke"></path>
-  </svg></div>`;
+  return `<div class="plot-face" data-values="${escapeHtml(JSON.stringify(paths.values))}">
+    <svg viewBox="0 0 100 ${paths.maxY}" preserveAspectRatio="none" aria-hidden="true">
+      <path class="plot-fill" d="${paths.area}"></path>
+      <path class="plot-line" d="${paths.line}" vector-effect="non-scaling-stroke"></path>
+      <path class="plot-avg" d="${paths.averageLine}" vector-effect="non-scaling-stroke"></path>
+    </svg>
+    <div class="plot-readout" hidden>
+      <span class="plot-cursor"></span>
+      <span class="plot-tip"></span>
+    </div>
+  </div>`;
+}
+
+function exactCount(value) {
+  const number = Number(value) || 0;
+  return Number.isInteger(number) ? String(number) : number.toFixed(2);
+}
+
+function traceText(face, value) {
+  const cell = face.closest(".metric-cell");
+  if (cell?.classList.contains("throughput") || cell?.classList.contains("retries")) return `${exactCount(value)} /s`;
+  if (cell?.classList.contains("time")) return formatDuration(value);
+  return exactCount(value);
+}
+
+let plotPointer = null;
+
+function hidePlotReadouts() {
+  document.querySelectorAll(".plot-readout").forEach(node => {
+    node.hidden = true;
+  });
+}
+
+function showPlotReadout(face, clientX) {
+  let values = [];
+  try {
+    values = JSON.parse(face.dataset.values || "[]");
+  } catch {
+    return;
+  }
+  if (!values.length) return;
+
+  const width = face.getBoundingClientRect().width;
+  const ratio = width <= 0 ? 0 : Math.min(1, Math.max(0, (clientX - face.getBoundingClientRect().left) / width));
+  const index = values.length === 1 ? 0 : Math.round(ratio * (values.length - 1));
+  const at = values.length === 1 ? 0 : index / (values.length - 1);
+  const readout = face.querySelector(".plot-readout");
+  hidePlotReadouts();
+  readout.hidden = false;
+  readout.querySelector(".plot-cursor").style.left = `${at * 100}%`;
+  const tip = readout.querySelector(".plot-tip");
+  tip.style.left = `${at * 100}%`;
+  tip.style.transform = at < 0.15 ? "translateX(0)" : at > 0.85 ? "translateX(-100%)" : "translateX(-50%)";
+  tip.textContent = traceText(face, values[index]);
+}
+
+function refreshPlotUnderPointer() {
+  if (!plotPointer) return;
+  const face = document.elementFromPoint(plotPointer.x, plotPointer.y)?.closest(".plot-face");
+  if (!face) {
+    hidePlotReadouts();
+    return;
+  }
+  showPlotReadout(face, plotPointer.x);
 }
 
 function span(value) {
@@ -280,6 +339,7 @@ function renderActivity() {
         ${metricCell("Critical", "time", row.criticalTime, formatDuration, 10, row.stale)}
       </div>
     </section>`).join("");
+  refreshPlotUnderPointer();
 }
 
 async function loadActivity() {
@@ -413,10 +473,29 @@ failureStatus.addEventListener("change", () => {
 });
 trafficEndpoint.addEventListener("change", loadTraffic);
 
+const activityList = document.querySelector("#activity-list");
+activityList.addEventListener("pointermove", event => {
+  const face = event.target.closest(".plot-face");
+  if (!face) {
+    plotPointer = null;
+    hidePlotReadouts();
+    return;
+  }
+  plotPointer = { x: event.clientX, y: event.clientY };
+  showPlotReadout(face, event.clientX);
+});
+activityList.addEventListener("pointerleave", () => {
+  plotPointer = null;
+  hidePlotReadouts();
+});
+
 clockTick();
 setInterval(clockTick, 1000);
 
+const pollEveryMs = 1000;
+
 async function poll() {
+  const started = performance.now();
   try {
     await loadBoard();
     if (view === "activity") await loadActivity();
@@ -424,6 +503,9 @@ async function poll() {
     if (view === "traffic") await loadTraffic();
   } catch (error) {
     showBanner(error.status ? `Control room ${error.status}` : "Control room did not answer.");
+  } finally {
+    const elapsed = performance.now() - started;
+    window.setTimeout(poll, Math.max(0, pollEveryMs - elapsed));
   }
 }
 
@@ -436,4 +518,3 @@ if (hash === "activity" || hash.startsWith("activity/")) {
 
 showView(view);
 poll();
-setInterval(poll, 4000);

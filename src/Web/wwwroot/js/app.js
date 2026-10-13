@@ -371,6 +371,107 @@ enrollForm.addEventListener("submit", async (event) => {
   }
 });
 
+const loadPrograms = ["Morning cohort", "Evening cohort", "Weekend cohort"];
+const loadSlots = Array.from({ length: 10 }, () => ({ on: false }));
+const loadThreads = document.querySelector("#load-threads");
+const loadThreadsValue = document.querySelector("#load-threads-value");
+const loadStart = document.querySelector("#load-start");
+const loadStop = document.querySelector("#load-stop");
+const loadStats = document.querySelector("#load-stats");
+let loadOn = false;
+let loadAccepted = 0;
+let loadFailed = 0;
+let loadInFlight = 0;
+let loadNext = 1;
+const loadPage = crypto.randomUUID().slice(0, 8);
+const ticksAtUnixEpoch = 621355968000000000;
+
+function nextStudentEmail() {
+  const n = loadNext++;
+  const ticks = ticksAtUnixEpoch + Date.now() * 10000 + n;
+  return `student-${ticks}-${loadPage}@example.com`;
+}
+
+function paintLoad() {
+  const running = loadOn ? `${loadInFlight} in flight. ` : "Stopped. ";
+  loadStats.textContent = `${running}${loadAccepted} accepted. ${loadFailed} failed.`;
+  loadStats.classList.remove("idle", "ok", "busy", "error");
+  loadStats.classList.add(loadOn ? "busy" : "idle");
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postGenerated() {
+  const n = loadNext;
+  const body = {
+    name: `Student ${n}`,
+    email: nextStudentEmail(),
+    program: loadPrograms[(n - 1) % loadPrograms.length],
+    processing: document.querySelector("#enroll-processing").value
+  };
+  loadInFlight += 1;
+  paintLoad();
+  try {
+    const response = await fetch("/api/enrollments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (response.ok) {
+      loadAccepted += 1;
+    } else {
+      loadFailed += 1;
+      await delay(250);
+    }
+  } catch {
+    loadFailed += 1;
+    await delay(250);
+  } finally {
+    loadInFlight -= 1;
+    paintLoad();
+  }
+}
+
+function loadPump(slot) {
+  async function step() {
+    while (slot.on) {
+      await postGenerated();
+    }
+  }
+
+  step();
+}
+
+function applyLoadThreads() {
+  const wanted = Number(loadThreads.value);
+  loadThreadsValue.textContent = String(wanted);
+  for (let i = 0; i < loadSlots.length; i += 1) {
+    const should = loadOn && i < wanted;
+    if (should && !loadSlots[i].on) {
+      loadSlots[i].on = true;
+      loadPump(loadSlots[i]);
+    } else if (!should) {
+      loadSlots[i].on = false;
+    }
+  }
+
+  loadStart.disabled = loadOn;
+  loadStop.disabled = !loadOn;
+  paintLoad();
+}
+
+loadThreads.addEventListener("input", applyLoadThreads);
+loadStart.addEventListener("click", () => {
+  loadOn = true;
+  applyLoadThreads();
+});
+loadStop.addEventListener("click", () => {
+  loadOn = false;
+  applyLoadThreads();
+});
+
 enrollRestart.addEventListener("click", () => {
   if (activeTrackingId) {
     startPolling(activeTrackingId);

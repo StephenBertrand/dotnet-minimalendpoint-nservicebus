@@ -12,7 +12,7 @@
       <p class="eyebrow">dotnet-minimalendpoint-nservicebus</p>
       <h1>API playground</h1>
     </div>
-    <p class="lede">This site is a separate Aspire service. It proxies <code>/api/*</code> to the API with service discovery. Enrollment is accepted immediately. The Enrollment endpoint finishes the row. The Orders endpoint turns that completion event into a command, and the command writes the welcome order. <a class="flight-link" href="/control.html">Open flight control</a>.</p>
+    <p class="lede">This site is the API playground. It proxies <code>/api/*</code> to the API with service discovery. Enrollment is accepted immediately. The Enrollment endpoint finishes the row. The Orders endpoint turns that completion event into a command, and the command writes the welcome order. <a class="flight-link" href="/flight" target="_blank" rel="noopener">Open flight control</a>.</p>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Playground">
@@ -90,6 +90,17 @@
 
         <button type="submit" id="enroll-submit">Enroll</button>
       </form>
+      <div class="load-box">
+        <h3>Generate</h3>
+        <p class="meta-line">Posts until you stop. Each email carries a clock tick, so a new run does not reuse an address. The processing choice above applies to every post. Switch playground tabs while it runs. Flight control is a separate site, so opening it leaves this page running.</p>
+        <div class="load-controls">
+          <label for="load-threads">Threads <output id="load-threads-value" for="load-threads">1</output></label>
+          <input id="load-threads" type="range" min="1" max="10" value="1">
+          <button type="button" id="load-start">Start</button>
+          <button type="button" id="load-stop" class="secondary" disabled>Stop</button>
+        </div>
+        <p id="load-stats" class="status idle">Stopped.</p>
+      </div>
       <p id="enroll-status" class="status idle">Fill in the form and submit. Empty fields are checked by the API.</p>
       <p id="enroll-log" class="call-log" aria-live="polite"></p>
       <div class="actions">

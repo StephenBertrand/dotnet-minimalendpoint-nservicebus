@@ -66,7 +66,9 @@ else
 var persistence = platform.AddPersistenceRavenDb("particular-persistence");
 var errorInstance = platform.AddServiceControlErrorInstance("particular-error", persistence);
 var auditInstance = platform.AddServiceControlAuditInstance("particular-audit", errorInstance, persistence);
-var monitoringInstance = platform.AddServiceControlMonitoringInstance("particular-monitoring");
+// ServicePulse reads throughput from the error instance. Monitoring must write that same queue.
+var monitoringInstance = platform.AddServiceControlMonitoringInstance("particular-monitoring")
+    .WithThroughputQueueFrom(errorInstance);
 platform.AddServicePulse("particular-servicepulse", errorInstance, monitoringInstance);
 
 var endpoint = builder.AddProject<Projects.Endpoint>("endpoint")
@@ -101,10 +103,19 @@ var api = builder.AddProject<Projects.Api>("api")
     .WaitFor(platform)
     .WaitFor(endpoint);
 
-builder.AddProject<Projects.Web>("web")
+var web = builder.AddProject<Projects.Web>("web")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(api)
     .WaitFor(api);
+
+var flight = builder.AddProject<Projects.Flight>("flight")
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    .WithReference(api)
+    .WaitFor(api);
+
+web.WithReference(flight);
+flight.WithReference(web);
 
 builder.Build().Run();

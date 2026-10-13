@@ -5,6 +5,7 @@
     <ProjectReference Include="..\Api\Api.csproj" />
     <ProjectReference Include="..\Endpoint\Endpoint.csproj" />
     <ProjectReference Include="..\Web\Web.csproj" />
+    <ProjectReference Include="..\Flight\Flight.csproj" />
   </ItemGroup>
 
   <ItemGroup>

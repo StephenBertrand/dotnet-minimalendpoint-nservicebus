@@ -1,78 +1,84 @@
-# Minimal endpoints, SQL, and NServiceBus endpoints
+# Enrollment, finished on a message
 
-This sample starts from the SQL playground and adds an enrollment that is accepted online and finished offline.
+An Aspire application that accepts an enrollment on HTTP and finishes it on NServiceBus. The API validates the form, returns **202 Accepted** with a tracking id, and sends one command. It does not write the row, and it does not use the outbox. The `Enrollment` endpoint writes SQL and, when the enrollment completes, publishes a fact. `Orders` turns that fact into its own command and writes the welcome order.
 
-The API validates the form, returns **202 Accepted** with a tracking id, and sends one `EnrollStudentCommand`. It does not write a tracking row first, and it does not use the transactional outbox. The `Enrollment` endpoint receives the command, inserts the row, and marks it completed. A completed enrollment publishes `EnrollmentCompletedEvent`. The `Orders` event handler only sends `CreateWelcomeOrderCommand`. That command handler writes the welcome order, and it is safe to retry. The browser polls until the enrollment row appears.
+Local messaging is RabbitMQ. Publish uses Azure Service Bus with `DefaultAzureCredential`. Business data stays in SQL. Both transports receive with `TransportTransactionMode.ReceiveOnly`, so the SQL save is already visible to a poll: `404`, then `completed` or `rejected`.
 
-| Environment | App Configuration | SQL | Messaging |
-| --- | --- | --- | --- |
-| Local (`dotnet run --project src/AppHost`) | Emulator container (image `1.2.0`) | Azure SQL resource **run as a SQL Server container** | RabbitMQ container, management on host port `15672` |
-| Publish to Azure | App Configuration store with **DefaultAzureCredential** | **Azure SQL with Microsoft Entra authentication** | Service Bus namespace with **DefaultAzureCredential** |
+```mermaid
+flowchart LR
+  web[Playground] --> api[Api]
+  api -->|EnrollStudentCommand| enrollment[Enrollment]
+  enrollment -->|EnrollmentCompletedEvent| orders[Orders]
+  orders -->|CreateWelcomeOrderCommand| orders
+  enrollment --> sql[(SQL)]
+  orders --> sql
+  enrollment --> sc[ServiceControl]
+  orders --> sc
+  flight[Flight control] --> api
+```
 
-## What you get
+## What is in the box
 
-| Path | Behavior |
-| --- | --- |
-| `web` `/` | Playground, including the enrollment form |
-| `web` `/api/*` | YARP forwarder to `api` |
-| `api` `GET /hello`, `GET /ping`, `/todos` | Same as the SQL sample |
-| `api` `POST /enrollments` | FluentValidation. Failures are `400` `application/problem+json`. Success is `202` with `{ trackingId }` and a `Location` header. |
-| `api` `GET /enrollments/{trackingId}` | `404` until the handler has written the row, then `200` with `completed` or `rejected` |
-| `api` `GET /orders` | Welcome orders written by the `Orders` endpoint |
-| `api` `GET` / `PUT /processing` | Queue gates for each endpoint and each handler: `running`, `pause`, or `error` |
-| `endpoint` | Two NServiceBus endpoints in one process: `Enrollment` and `Orders` |
+- A playground for the HTTP API, including a generator that posts 1–10 enrollments at a time. Each address carries a clock tick, so a new run does not reuse one.
+- Flight control, a separate site. Opening it does not stop the generator. It reads the same ServiceControl error, audit, and monitoring instances as ServicePulse.
+- Two NServiceBus endpoints in one worker process. The host does not name the handlers it runs.
+- A beta queue gate: hold a command without failing it, or send a message straight to the error queue.
+- The same endpoint code on RabbitMQ locally and Azure Service Bus when published.
 
-The form field `processing` is `immediate` or `delayed`. Delayed messages use `DelayDeliveryWith` of one minute so the page can show the slow path. The page polls every 2 seconds. Within 10 seconds of completion it says the transaction is done. After 10 seconds it tells a joke and keeps waiting. After 2 minutes it stops and offers a button that polls the same tracking id again.
+A repeated tracking id is safe. A completed enrollment stays completed and publishes again. A second tracking id for an email that is already completed is stored as rejected. The filtered index `IX_Enrollments_CompletedEmail` still stops two completed rows for one email.
 
-## Messaging
+## Handlers register themselves
 
-- Transport uses the `messaging` connection. A string that starts with `amqp://` or `amqps://` is RabbitMQ. Anything else is Azure Service Bus. Enrollment rows stay in SQL on the `enrollments` connection.
-- A local run starts RabbitMQ. Publish provisions a Service Bus namespace and uses `DefaultAzureCredential`. Both use quorum or topic routing that matches the broker, and both receive with `TransportTransactionMode.ReceiveOnly`.
-- The API endpoint is send-only and named `Api`. `EnrollStudentCommand` is routed to `Enrollment`.
-- Delayed delivery is held by the broker, so the send-only API can delay a message and then exit. RabbitMQ uses its native delay infrastructure. Service Bus uses `ScheduledEnqueueTimeUtc`.
-- Message names are the convention. A type whose name ends in `Command` is a command. A type whose name ends in `Event` is an event. Neither implements a NServiceBus marker interface.
-- `Enrollment` and `Orders` run in the same process as separate endpoints. Assembly scanning is off, and each handler is registered on its own endpoint.
-- NServiceBus starts only when `ConnectionStrings:messaging` is present. Unit tests use the in-memory databases and a fake sender.
-- Welcome orders stay in SQL on the `orders` connection. The order handler is idempotent on the enrollment tracking id.
+A feature is a folder. `EnrollStudent/` holds the use case, the handler, and an `AutoConfigureServices` marker. `Shared/` owns the database. Delete the feature folder and that handler is gone.
 
-The handler writes the row once, as `completed` or `rejected`. The host is `ReceiveOnly` and has no outbox, so that save is already visible to a poll. There is no `inprogress` step. A poll sees `404`, then the finished status. The one-minute delay is what makes the wait visible.
+The worker discovers every `IFeatureHandlers` marker and starts one endpoint per destination. Assembly scanning is off. NServiceBus 10 generates `AddEnrollStudentCommandHandler()`, and the host invokes that method for handlers in the marker's namespace whose destination matches. `AddAll` is not used, so one assembly can place handlers on different endpoints.
 
-A second delivery of the same tracking id is safe. A completed row stays completed and the completion event is published again. A rejected row stays rejected. A different tracking id for an email that is already completed is stored as `rejected` with "An enrollment for this email already exists." The filtered unique index `IX_Enrollments_CompletedEmail` still stops two completed rows for one email.
+The Endpoint project never names a feature type. The compiler drops a project reference the host does not mention, so discovery also loads the project assemblies listed in the host deps file. The Endpoint and API projects still reference Enrollment and Orders, which is what copies those assemblies next to the host.
 
-## Queue gates
+```csharp
+[Handler]
+public sealed class EnrollStudentCommandHandler(EnrollStudent enroll, ...)
+{
+    public async Task Handle(EnrollStudentCommand message, IMessageHandlerContext context)
+    {
+        var outcome = await enroll.ProcessAsync(message, context.CancellationToken);
+        if (outcome != EnrollmentOutcome.Completed)
+        {
+            return;
+        }
 
-App Configuration stores one string per endpoint and one string per handler under `Demo:Processing:`. A missing value means `running`. The playground Processing tab writes these keys and bumps `Demo:Sentinel`.
+        await context.Publish(completed);
+    }
+}
+```
 
-| Mode | What the pipeline does |
+The handler logs, calls the use case, and publishes only when the outcome is completed. Shape checks stay on the API with FluentValidation and return `400` before the send. Duplicate email and a repeated tracking id are business outcomes inside `EnrollStudent`, not validation failures.
+
+## A message names its endpoint
+
+Commands carry `[RouteTo]`. Events do not. The handler that reacts to an event carries `[HandleOn]`. A name ending in `Command` is a command. A name ending in `Event` is an event. Message types do not implement an NServiceBus interface, and `src/Messages` does not reference NServiceBus.
+
+| Message | Placed by | Endpoint |
+| --- | --- | --- |
+| `EnrollStudentCommand` | `[RouteTo("Enrollment")]` | Enrollment |
+| `EnrollmentCompletedEvent` | `[HandleOn("Orders")]` on the handler | Orders |
+| `CreateWelcomeOrderCommand` | `[RouteTo("Orders")]` | Orders |
+
+The event handler only sends `CreateWelcomeOrderCommand`. The command handler does the SQL write, and it is idempotent on the tracking id. One subscriber failing does not share a transaction with another subscriber's work.
+
+## Pause a handler (beta)
+
+App Configuration stores one string per endpoint and one per message under `Demo:Processing:`. A missing key means `running`. The worker refreshes the store about every 5 seconds. The playground Processing tab writes the keys.
+
+| Mode | What happens |
 | --- | --- |
 | `running` | The handler runs. |
-| `pause` | Commands only. The handler does not run. The command is sent back to this endpoint with a 30 second delay. It does not go to the error queue. Events ignore pause and the handler runs. |
-| `error` | The pipeline throws `RoutedToErrorException`. That exception is unrecoverable, so NServiceBus skips retries and moves the message to the error queue. |
+| `pause` | Commands only. The handler does not run. The command is sent back to this endpoint with a 30 second delay and a new message id. It does not go to the error queue. |
+| `error` | The pipeline throws `RoutedToErrorException` before the handler. NServiceBus skips retries and moves that endpoint's copy to the error queue. |
 
-An endpoint mode other than `running` covers that endpoint, except pause, which holds only commands. A handler mode applies only while its endpoint is running. `Orders` can be paused because it handles `CreateWelcomeOrderCommand`. The welcome-order event cannot. Route to error still applies to both. Holding `EnrollStudentCommand` also holds the welcome order, because the event is published only after that command completes. Holding `CreateWelcomeOrderCommand` holds the SQL write after the event handler has already sent it. The event handler does no I/O, so a failure there does not share a transaction with the order write.
+An event is a fact, so pause does not apply to it. An endpoint set to `error` covers every message on that endpoint. Set a paused command back to `running` and the next 30 second delivery is handled.
 
-`HandleCurrentMessageLater` would retry immediately and spin. Aborting the pipeline without a send would drop the message.
-
-The endpoint process has no HTTP requests, so a hosted service refreshes App Configuration every 5 seconds. The API still refreshes through middleware as well. The Processing page reads the store directly, so the selects do not flip back while that cache is stale.
-
-## ServicePulse
-
-The AppHost runs the Particular platform on the same broker as the endpoints. Locally that broker is RabbitMQ. Publish uses the Service Bus namespace. Enrollment rows stay in SQL. The host adds:
-
-| Resource | Role |
-| --- | --- |
-| `particular-error` | ServiceControl error instance. Reads the `error` queue. Heartbeats go to its input queue, `Particular.ServiceControl`. |
-| `particular-audit` | ServiceControl audit instance. Reads the `audit` queue. |
-| `particular-monitoring` | ServiceControl monitoring instance. Reads `Particular.Monitoring` and serves queue length. |
-| `particular-servicepulse` | Stock ServicePulse UI, kept so the two screens can be compared. Monitoring is wired in, so the monitoring page is configured. |
-| Flight control | Its own `flight` site. Same ServiceControl data, drawn as a control room. The API reads `particular-error`, `particular-audit`, and `particular-monitoring`. The Activity tab lists each endpoint as five plots (queue length, throughput, retries, processing time, critical time). The number is the average for the selected window. History windows match ServicePulse: 1m, 5m, 10m, 15m, 30m, and 1h. Traffic opens on all audited endpoints. |
-| `particular-persistence` | RavenDB for ServiceControl. Enrollment rows stay in SQL. |
-
-`Enrollment` and `Orders` each audit processed messages, send heartbeats, and send metrics every 10 seconds. The send-only `Api` sends heartbeats. Metrics are not supported on a send-only endpoint. Queue length on the flight-control board comes from `/monitored-endpoints`. A missing monitoring reference stays dark. A failed call shows down. The board does not invent a number.
-
-`pause` does not fail the command, so held work does not appear under Failed Messages. While a command gate is paused, new audit records for that command stop, heartbeats show the endpoint is still up, and the scheduled command waits on the broker. Set the gate back to `running` and the next 30 second delivery is audited as a success. A paused enrollment does not publish `EnrollmentCompletedEvent` until the command runs. `error` is what shows up as a failed message, for a command or an event, with no retries. A real handler exception still retries, then shows up as a failed message.
-
-If no Particular license file is found, Aspire injects the placeholder `Trial`. ServiceControl then uses its own trial behavior. Put a `license.xml` where the host looks (`LocalApplicationData/ParticularSoftware` or `CommonApplicationData/ParticularSoftware`), or set `PARTICULARSOFTWARE_LICENSE`, to use a real license.
+This is beta because the host is `ReceiveOnly` and has no outbox. The delayed copy and the acknowledgement of the original delivery are not one transaction. Handlers are idempotent on the tracking id, so a duplicate delivery does not write a second row. A paused command does not show up as a failed message. `error` does.
 
 ## Run
 
@@ -80,38 +86,37 @@ If no Particular license file is found, Aspire injects the placeholder `Trial`. 
 dotnet run --project src/AppHost
 ```
 
-Open the **web** resource in the Aspire dashboard for the playground. Open the **flight** resource for flight control. The playground link opens that site in a new tab. Stock ServicePulse is still `particular-servicepulse`. Docker must be running. The first start pulls RabbitMQ, its SQL Server container, ServiceControl (error, audit, and monitoring), ServicePulse, and RavenDB. RabbitMQ management is published on host port `15672`. The AMQP port is assigned by Aspire. The RabbitMQ user is `enrollment`, because RabbitMQ refuses `guest` from another container and ServiceControl connects from its own container.
-
-To hold or flush a command, open the playground **Processing** tab. Pause applies to `EnrollStudentCommand`, `CreateWelcomeOrderCommand`, and either endpoint. The welcome-order event row has no pause control. The endpoint notices a change within about 5 seconds. Set a paused command back to **Running** and it is handled on its next 30 second delivery. A message routed to error stays in ServicePulse until it is retried or archived there.
-
-## Add a feature
-
-1. Folder under `src/Api/Features/<Name>/`
-2. Implement `IEndpoint`
-3. `AddFeatureEndpoints` registers it
-
-`src/Messages` is only the message types, namespace `Messages`, whatever folder holds the file. `[RouteTo]` comes from `src/Routing`. An event has no route. `src/Endpoint.Extensions` holds feature registration, handler logging, and the queue gate. `src/Enrollment` and `src/Orders` are the feature assemblies. Each has an `IFeatureHandlers` marker, and the endpoint host calls it. Handler classes use `[Handler]` and a `Handle` method. The enrollment database stays in `src/Enrollment`. The orders database stays in `src/Orders`. `src/Endpoint` hosts both queues. `src/Transport` picks RabbitMQ or Azure Service Bus.
-
-## Tests
+Docker must be running. The first start pulls RabbitMQ, SQL Server, ServiceControl, ServicePulse, and RavenDB. Open the **web** resource for the playground and the **flight** resource for flight control. Stock ServicePulse is `particular-servicepulse`.
 
 ```bash
 dotnet test
 ```
 
-Hello, Ping, and Enrollment HTTP tests use `WebApplicationFactory`. They do not start NServiceBus. Enrollment processor tests use the EF in-memory provider. Todos tests start a SQL Server Testcontainer. Docker must be running for those.
+HTTP tests use `WebApplicationFactory` and do not start NServiceBus. Enrollment and order tests use the EF in-memory provider. Todos tests start a SQL Server Testcontainer.
 
-## Migrations
+## Flight control
 
-```bash
-dotnet tool restore
-dotnet ef migrations add <Name> --project src/Enrollment --startup-project src/Enrollment --context EnrollmentsDbContext --output-dir Migrations
-dotnet ef migrations add <Name> --project src/Orders --startup-project src/Orders --context OrdersDbContext --output-dir Migrations
-```
+Same ServiceControl data as ServicePulse, drawn as a control room. The number on each chart is the average for the selected window. Hover a chart for the sample under the pointer. History matches ServicePulse: 1 minute through 1 hour.
 
-Todos migrations stay in `src/Api`:
+The board is heartbeats, the error queue, and ServiceControl's own checks.
 
-```bash
-dotnet ef migrations add <Name> --project src/Api --startup-project src/Api
-```
+![Flight control board: three endpoints beating, no unresolved faults, eleven custom checks passing](docs/images/flight-board.png)
 
-Startup calls `MigrateAsync` for each relational database. The NServiceBus installers create queue tables after that, when the connection string is present.
+Activity is queue length, throughput, retries, processing time, and critical time. This window is one minute of enrollments from the playground generator.
+
+![Flight control activity: enrollment and orders throughput spikes, with processing and critical time beside them](docs/images/flight-activity.png)
+
+## Projects
+
+| Project | Owns |
+| --- | --- |
+| `Messages` | Message types. Namespace `Messages`. No NServiceBus package. |
+| `Routing` | `[RouteTo]`, `[HandleOn]`, and the command/event name rules. |
+| `Endpoint.Extensions` | Feature discovery, handler logging, and the queue-gate rules. No NServiceBus package. |
+| `Transport` | RabbitMQ when the connection starts with `amqp://` or `amqps://`. Otherwise Azure Service Bus. |
+| `Enrollment`, `Orders` | Feature folders and their databases. |
+| `Endpoint` | The generic worker. One process, one NServiceBus endpoint per destination. |
+| `Api` | Send-only endpoint `Api`. Validates, returns 202, reads SQL. |
+| `Web` | The playground. |
+| `Flight` | Flight control. |
+| `AppHost` | Aspire. Local RabbitMQ, publish Azure Service Bus. |

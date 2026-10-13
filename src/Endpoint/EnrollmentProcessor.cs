@@ -10,12 +10,17 @@ namespace EnrollmentEndpoint;
 /// </summary>
 public sealed class EnrollmentProcessor(DbContextOptions<EnrollmentsDbContext> options)
 {
-    public async Task ProcessAsync(EnrollStudent message, CancellationToken cancellationToken)
+    public async Task<EnrollmentOutcome> ProcessAsync(EnrollStudentCommand message, CancellationToken cancellationToken)
     {
         var existing = await FindAsync(message.TrackingId, cancellationToken);
-        if (existing is { Status: EnrollmentStatus.Completed or EnrollmentStatus.Rejected })
+        if (existing is { Status: EnrollmentStatus.Completed })
         {
-            return;
+            return EnrollmentOutcome.Completed;
+        }
+
+        if (existing is { Status: EnrollmentStatus.Rejected })
+        {
+            return EnrollmentOutcome.Rejected;
         }
 
         if (existing is null)
@@ -44,7 +49,7 @@ public sealed class EnrollmentProcessor(DbContextOptions<EnrollmentsDbContext> o
             row.Message = EnrollmentStatus.DuplicateEmailMessage;
             row.CompletedUtc = null;
             await SaveAsync(row, cancellationToken);
-            return;
+            return EnrollmentOutcome.Rejected;
         }
 
         row.Status = EnrollmentStatus.Completed;
@@ -65,10 +70,13 @@ public sealed class EnrollmentProcessor(DbContextOptions<EnrollmentsDbContext> o
             row.Message = EnrollmentStatus.DuplicateEmailMessage;
             row.CompletedUtc = null;
             await SaveAsync(row, cancellationToken);
+            return EnrollmentOutcome.Rejected;
         }
+
+        return EnrollmentOutcome.Completed;
     }
 
-    private async Task<bool> EmailIsAlreadyEnrolledAsync(EnrollStudent message, CancellationToken cancellationToken)
+    private async Task<bool> EmailIsAlreadyEnrolledAsync(EnrollStudentCommand message, CancellationToken cancellationToken)
     {
         using var suppress = SuppressAmbientTransaction();
         await using var db = new EnrollmentsDbContext(options);

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight control</title>
+  <link rel="stylesheet" href="/css/control.css">
+</head>
+<body>
+  <div class="room">
+    <header class="mast">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <p class="kicker">NSB-01 · Enrollment stack</p>
+          <h1>Flight control</h1>
+        </div>
+      </div>
+      <p class="clock" aria-live="polite"><span id="clock">--:--:--</span><span>UTC</span></p>
+      <p class="license" id="license">Link —</p>
+      <a class="back" href="/">Playground</a>
+    </header>
+
+    <section class="meters" aria-label="Stack meters">
+      <article class="meter">
+        <p>Heartbeats</p>
+        <strong id="meter-beats">—</strong>
+        <span id="meter-beats-note">waiting</span>
+      </article>
+      <article class="meter">
+        <p>Unresolved faults</p>
+        <strong id="meter-faults">—</strong>
+        <span>error queue</span>
+      </article>
+      <article class="meter">
+        <p>Checks</p>
+        <strong id="meter-checks">—</strong>
+        <span id="meter-checks-note">custom checks</span>
+      </article>
+      <button type="button" class="meter meter-dark" id="meter-queues">
+        <p>Queue length</p>
+        <strong id="meter-queues-value">—</strong>
+        <span id="meter-queues-note">open activity</span>
+      </button>
+    </section>
+
+    <p id="banner" class="banner" hidden></p>
+
+    <nav class="views" role="tablist" aria-label="Control room">
+      <button type="button" class="view" data-view="board" aria-selected="true">Board</button>
+      <button type="button" class="view" data-view="activity" aria-selected="false">Activity</button>
+      <button type="button" class="view" data-view="faults" aria-selected="false">Faults</button>
+      <button type="button" class="view" data-view="traffic" aria-selected="false">Traffic</button>
+      <button type="button" class="view" data-view="log" aria-selected="false">Log</button>
+    </nav>
+
+    <main>
+      <section id="view-board" class="panel-grid">
+        <article class="panel">
+          <header><h2>Endpoints</h2><span>heartbeat</span></header>
+          <div id="endpoints" class="rows"></div>
+        </article>
+        <article class="panel">
+          <header><h2>Custom checks</h2><span id="check-count"></span></header>
+          <div id="checks" class="rows"></div>
+        </article>
+      </section>
+
+      <section id="view-activity" hidden>
+        <article class="panel">
+          <header>
+            <h2>Activity</h2>
+            <div class="periods" role="group" aria-label="History">
+              <button type="button" class="period" data-history="1" aria-pressed="true">1m</button>
+              <button type="button" class="period" data-history="5" aria-pressed="false">5m</button>
+              <button type="button" class="period" data-history="10" aria-pressed="false">10m</button>
+              <button type="button" class="period" data-history="15" aria-pressed="false">15m</button>
+              <button type="button" class="period" data-history="30" aria-pressed="false">30m</button>
+              <button type="button" class="period" data-history="60" aria-pressed="false">1h</button>
+            </div>
+          </header>
+          <p id="activity-note" class="note"></p>
+          <div id="activity-list"></div>
+        </article>
+      </section>
+
+      <section id="view-faults" class="panel-grid" hidden>
+        <article class="panel">
+          <header>
+            <h2>Groups</h2>
+            <label>Group by
+              <select id="classifier">
+                <option>Exception Type and Stack Trace</option>
+                <option>Message Type</option>
+                <option>Endpoint Address</option>
+                <option>Endpoint Instance</option>
+                <option>Endpoint Name</option>
+              </select>
+            </label>
+          </header>
+          <div id="groups" class="rows"></div>
+        </article>
+        <article class="panel">
+          <header>
+            <h2>Messages</h2>
+            <label>Show
+              <select id="failure-status">
+                <option value="unresolved">Unresolved</option>
+                <option value="archived">Archived</option>
+              </select>
+            </label>
+          </header>
+          <div id="failures" class="rows"></div>
+        </article>
+        <article class="panel span">
+          <header><h2>Selected fault</h2><span id="detail-id">none</span></header>
+          <div id="detail" class="detail">Select a message.</div>
+        </article>
+      </section>
+
+      <section id="view-traffic" hidden>
+        <article class="panel">
+          <header>
+            <h2>Audited messages</h2>
+            <label>Endpoint
+              <select id="traffic-endpoint">
+                <option selected>All</option>
+                <option>Enrollment</option>
+                <option>Orders</option>
+                <option>Api</option>
+              </select>
+            </label>
+          </header>
+          <p id="traffic-note" class="note" hidden></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Message</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Critical</th>
+                  <th>Processing</th>
+                  <th>Sent</th>
+                </tr>
+              </thead>
+              <tbody id="traffic"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-log" hidden>
+        <article class="panel">
+          <header><h2>Event log</h2><span>ServiceControl</span></header>
+          <div id="events" class="rows"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="/js/control.js"></script>
+</body>
+</html>

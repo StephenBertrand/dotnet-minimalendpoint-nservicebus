@@ -1,3 +1,5 @@
+using Particular.Aspire.Hosting.ServicePlatform.Transport;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var appConfiguration = builder.AddAzureAppConfiguration("appconfiguration");
@@ -31,45 +33,49 @@ if (builder.ExecutionContext.IsRunMode)
 
 var todos = sql.AddDatabase("todos");
 var enrollments = sql.AddDatabase("enrollments");
+var orders = sql.AddDatabase("orders");
 
-// Local run uses the Service Bus emulator (image 2.0.0, which supports the administration client).
-// Publish provisions a real namespace. Ports 5672 and 5300 stay fixed so NServiceBus can reach
-// the emulator's AMQP endpoint and its administration endpoint.
-var messaging = builder.AddAzureServiceBus("messaging");
-
+// Local run uses RabbitMQ. Publish provisions a real Service Bus namespace.
+// The username is not guest: RabbitMQ refuses the guest user from another container,
+// and ServiceControl connects from its own container. Management stays on 15672 so the
+// transport can check quorum delivery limits from the host.
+IResourceBuilder<IResourceWithConnectionString> messaging;
+var platform = builder.AddParticularPlatform("particular");
 if (builder.ExecutionContext.IsRunMode)
 {
-    messaging.RunAsEmulator(emulator =>
-    {
-        emulator.WithHostPort(5672);
-        emulator.WithEndpoint("emulatorhealth", endpoint => endpoint.Port = 5300);
-    });
+    var rabbitUser = builder.AddParameter("rabbit-username", "enrollment");
+    var rabbit = builder.AddRabbitMQ("messaging", rabbitUser)
+        .WithManagementPlugin(15672);
+    messaging = rabbit;
+    platform = platform.WithTransportRabbitMQ(RabbitMqRouting.QuorumConventionalRouting, rabbit);
+}
+else
+{
+    var serviceBus = builder.AddAzureServiceBus("messaging");
+    serviceBus.AddServiceBusQueue("sb-enrollment", "Enrollment");
+    serviceBus.AddServiceBusQueue("sb-orders", "Orders");
+    serviceBus.AddServiceBusQueue("sb-error", "error");
+    serviceBus.AddServiceBusQueue("sb-audit", "audit");
+    serviceBus.AddServiceBusQueue("sb-servicecontrol", "Particular.ServiceControl");
+    serviceBus.AddServiceBusQueue("sb-monitoring", "Particular.Monitoring");
+    messaging = serviceBus;
+    platform = platform.WithTransportAzureServiceBus(serviceBus);
 }
 
-// Declared up front so the emulator config and the published namespace both contain them.
-// ServiceControl setup also creates its own internal queues when the administration client is available.
-messaging.AddServiceBusQueue("sb-enrollment", "Enrollment");
-messaging.AddServiceBusQueue("sb-error", "error");
-messaging.AddServiceBusQueue("sb-audit", "audit");
-messaging.AddServiceBusQueue("sb-servicecontrol", "Particular.ServiceControl");
-messaging.AddServiceBusQueue("sb-monitoring", "Particular.Monitoring");
-
 // ServiceControl stores its own data in RavenDB. Enrollment rows stay in SQL.
-// The emulator's administration client listens on port 5300. ServiceControl's topic
-// setup uses the data-plane connection string, so it never reaches that port. These
-// integration events are not what ServicePulse reads, so leave them unpublished.
-var platform = builder.AddParticularPlatform("particular")
-    .WithTransportAzureServiceBus(messaging);
 var persistence = platform.AddPersistenceRavenDb("particular-persistence");
-platform.AddServiceControlErrorInstance("particular-error", persistence)
-    .WithEnvironment("SERVICECONTROL_DISABLEEXTERNALINTEGRATIONSPUBLISHING", "True");
-platform.AddDefaultComponents();
+var errorInstance = platform.AddServiceControlErrorInstance("particular-error", persistence);
+var auditInstance = platform.AddServiceControlAuditInstance("particular-audit", errorInstance, persistence);
+var monitoringInstance = platform.AddServiceControlMonitoringInstance("particular-monitoring");
+platform.AddServicePulse("particular-servicepulse", errorInstance, monitoringInstance);
 
 var endpoint = builder.AddProject<Projects.Endpoint>("endpoint")
     .WithReference(appConfiguration)
     .WaitFor(appConfiguration)
     .WithReference(enrollments)
     .WaitFor(enrollments)
+    .WithReference(orders)
+    .WaitFor(orders)
     .WithReference(messaging)
     .WaitFor(messaging)
     .WithParticularPlatform(platform)
@@ -84,8 +90,13 @@ var api = builder.AddProject<Projects.Api>("api")
     .WaitFor(todos)
     .WithReference(enrollments)
     .WaitFor(enrollments)
+    .WithReference(orders)
+    .WaitFor(orders)
     .WithReference(messaging)
     .WaitFor(messaging)
+    .WithReference(errorInstance.GetEndpoint("http"))
+    .WithReference(auditInstance.GetEndpoint("http"))
+    .WithReference(monitoringInstance.GetEndpoint("http"))
     .WithParticularPlatform(platform)
     .WaitFor(platform)
     .WaitFor(endpoint);

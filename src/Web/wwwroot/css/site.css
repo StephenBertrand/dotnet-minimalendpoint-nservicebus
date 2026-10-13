@@ -32,6 +32,11 @@ main,
   padding: 2.5rem 0 1.5rem;
 }
 
+.flight-link {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  color: var(--accent);
+}
+
 .eyebrow {
   margin: 0;
   letter-spacing: 0.08em;
@@ -244,6 +249,32 @@ select {
   background: #fff;
   width: 100%;
 }
+
+.gate {
+  margin-top: 1.1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+.gate h3 {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+}
+
+.gate-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 14rem;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.55rem;
+}
+
+.gate-row label {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
+.gate-row select { width: 100%; }
 
 .enroll-form {
   display: grid;

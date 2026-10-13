@@ -64,7 +64,14 @@ sealed class AppConfigurationRefreshHostedService(IConfigurationRefresherProvide
                 await refresher.TryRefreshAsync(stoppingToken);
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
     }
 }

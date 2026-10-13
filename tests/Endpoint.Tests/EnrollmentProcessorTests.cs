@@ -15,7 +15,7 @@ public sealed class EnrollmentProcessorTests
             .Options;
         var processor = new EnrollmentProcessor(options);
         var trackingId = Guid.NewGuid();
-        var message = new EnrollStudent
+        var message = new EnrollStudentCommand
         {
             TrackingId = trackingId,
             Name = "Ada Lovelace",
@@ -40,7 +40,7 @@ public sealed class EnrollmentProcessorTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         var processor = new EnrollmentProcessor(options);
-        var message = new EnrollStudent
+        var message = new EnrollStudentCommand
         {
             TrackingId = Guid.NewGuid(),
             Name = "Grace Hopper",
@@ -62,7 +62,7 @@ public sealed class EnrollmentProcessorTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         var processor = new EnrollmentProcessor(options);
-        await processor.ProcessAsync(new EnrollStudent
+        await processor.ProcessAsync(new EnrollStudentCommand
         {
             TrackingId = Guid.NewGuid(),
             Name = "Ada Lovelace",
@@ -71,7 +71,7 @@ public sealed class EnrollmentProcessorTests
         }, CancellationToken.None);
 
         var duplicateId = Guid.NewGuid();
-        await processor.ProcessAsync(new EnrollStudent
+        await processor.ProcessAsync(new EnrollStudentCommand
         {
             TrackingId = duplicateId,
             Name = "Ada Lovelace",

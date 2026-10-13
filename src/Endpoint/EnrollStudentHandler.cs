@@ -3,8 +3,23 @@ using NServiceBus;
 
 namespace EnrollmentEndpoint;
 
-public sealed class EnrollStudentHandler(EnrollmentProcessor processor) : IHandleMessages<EnrollStudent>
+[Handler]
+public sealed class EnrollStudentHandler(EnrollmentProcessor processor) : IHandleMessages<EnrollStudentCommand>
 {
-    public Task Handle(EnrollStudent message, IMessageHandlerContext context) =>
-        processor.ProcessAsync(message, context.CancellationToken);
+    public async Task Handle(EnrollStudentCommand message, IMessageHandlerContext context)
+    {
+        var outcome = await processor.ProcessAsync(message, context.CancellationToken);
+        if (outcome != EnrollmentOutcome.Completed)
+        {
+            return;
+        }
+
+        await context.Publish(new EnrollmentCompletedEvent
+        {
+            TrackingId = message.TrackingId,
+            Name = message.Name,
+            Email = message.Email,
+            Program = message.Program
+        });
+    }
 }

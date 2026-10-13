@@ -30,11 +30,6 @@ public static class EnrollmentStatus
     public const string DuplicateEmailMessage = "An enrollment for this email already exists.";
 }
 
-public static class EnrollmentFeatures
-{
-    public const string StopProcessing = "StopProcessing";
-}
-
 public static class ProcessingModes
 {
     public const string Immediate = "immediate";

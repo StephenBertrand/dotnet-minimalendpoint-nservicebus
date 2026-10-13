@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.5.3" />
     <PackageReference Include="Aspire.Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="13.5.3" />
+    <PackageReference Include="Azure.Data.AppConfiguration" Version="1.11.0" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="8.6.0" />
@@ -20,7 +21,6 @@
     <PackageReference Include="Microsoft.FeatureManagement.AspNetCore" Version="4.7.0" />
     <PackageReference Include="NServiceBus.Extensions.Hosting" Version="4.1.0" />
     <PackageReference Include="NServiceBus.Heartbeat" Version="6.0.0" />
-    <PackageReference Include="NServiceBus.Transport.AzureServiceBus" Version="6.2.0" />
   </ItemGroup>
 
   <ItemGroup>

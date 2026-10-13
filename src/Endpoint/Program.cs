@@ -7,10 +7,12 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 builder.AddDemoAzureAppConfiguration();
 builder.AddEnrollmentStore();
-builder.AddEnrollmentProcessingEndpoint();
+builder.AddOrderStore();
+builder.AddEnrollmentProcessingEndpoints();
 
 var app = builder.Build();
 
 await app.ApplyEnrollmentSchemaAsync();
+await app.ApplyOrderSchemaAsync();
 
 app.Run();

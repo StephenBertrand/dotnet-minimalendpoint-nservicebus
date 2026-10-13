@@ -416,6 +416,132 @@ lookupForm.addEventListener("submit", (event) => {
 
 loadEnrollments("").catch((error) => showError(error.message));
 
+const ordersList = document.querySelector("#orders-list");
+const ordersEmpty = document.querySelector("#orders-empty");
+const ordersRefresh = document.querySelector("#orders-refresh");
+const gateList = document.querySelector("#gate-list");
+const processingNote = document.querySelector("#processing-note");
+
+const gateLabels = {
+  running: "Running",
+  pause: "Pause processing",
+  error: "Route to error"
+};
+
+function renderOrders(items) {
+  ordersList.replaceChildren();
+  ordersEmpty.hidden = items.length > 0;
+  for (const item of items) {
+    const li = document.createElement("li");
+    const who = document.createElement("strong");
+    who.textContent = item.name;
+    const state = document.createElement("span");
+    state.textContent = item.summary;
+    const detail = document.createElement("span");
+    detail.textContent = `${item.email} · ${item.trackingId}`;
+    li.append(who, state, detail);
+    ordersList.append(li);
+  }
+}
+
+async function loadOrders() {
+  const items = await readJson(await fetch("/api/orders"));
+  renderOrders(items);
+}
+
+ordersRefresh.addEventListener("click", () => {
+  loadOrders().catch((error) => showError(error.message));
+});
+
+function allowsPause(message, handlers) {
+  if (message) return message.endsWith("Command");
+  return handlers.some((handler) => handler.message.endsWith("Command"));
+}
+
+function gateSelect(mode, disabled, allowPause) {
+  const select = document.createElement("select");
+  select.disabled = disabled;
+  for (const [value, label] of Object.entries(gateLabels)) {
+    if (value === "pause" && !allowPause) continue;
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    option.selected = value === mode;
+    select.append(option);
+  }
+  return select;
+}
+
+function renderGates(catalog) {
+  gateList.replaceChildren();
+  processingNote.textContent = catalog.canUpdate
+    ? "Endpoints notice a change within about 5 seconds."
+    : "App Configuration is not connected, so these gates cannot be changed from the page.";
+
+  for (const endpoint of catalog.endpoints) {
+    const section = document.createElement("section");
+    section.className = "gate";
+    const heading = document.createElement("h3");
+    heading.textContent = endpoint.label;
+    section.append(heading);
+    section.append(gateRow(catalog, endpoint.name, null, "Whole endpoint", endpoint.mode, endpoint.handlers));
+    for (const handler of endpoint.handlers) {
+      section.append(gateRow(catalog, endpoint.name, handler.message, handler.label, handler.mode, endpoint.handlers));
+    }
+    gateList.append(section);
+  }
+}
+
+function gateRow(catalog, endpoint, message, label, mode, handlers) {
+  const row = document.createElement("div");
+  row.className = "gate-row";
+  const caption = document.createElement("label");
+  caption.textContent = label;
+  const select = gateSelect(mode, !catalog.canUpdate, allowsPause(message, handlers));
+  row.append(caption, select);
+  select.addEventListener("change", () => {
+    saveGate(endpoint, message, select).catch((error) => showError(error.message));
+  });
+  return row;
+}
+
+async function saveGate(endpoint, message, select) {
+  const mode = select.value;
+  select.disabled = true;
+  processingNote.textContent = "Saving…";
+  try {
+    const response = await fetch("/api/processing", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint, message, mode })
+    });
+    if (!response.ok) {
+      const problem = await response.json().catch(() => null);
+      const detail = problem?.errors
+        ? Object.values(problem.errors).flat().join(" ")
+        : problem?.detail;
+      throw new Error(detail || `Could not update the gate (${response.status}).`);
+    }
+    renderGates(await response.json());
+  } catch (error) {
+    processingNote.textContent = error.message;
+    showError(error.message);
+    select.disabled = false;
+  }
+}
+
+async function loadGates() {
+  const response = await fetch("/api/processing");
+  if (!response.ok) {
+    processingNote.textContent = `Could not read the gates (${response.status}).`;
+    return;
+  }
+  renderGates(await response.json());
+}
+
+loadOrders().catch((error) => showError(error.message));
+loadGates().catch((error) => showError(error.message));
+
 const tabs = [...document.querySelectorAll("[role='tab']")];
 
 function showTab(name, { updateHash = true } = {}) {

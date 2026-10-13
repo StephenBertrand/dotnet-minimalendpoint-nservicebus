@@ -1,21 +1,18 @@
-using Azure.Identity;
 using Enrollment;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.FeatureManagement;
 using NServiceBus;
 
 namespace EnrollmentEndpoint;
 
 public static class EnrollmentProcessing
 {
-    public const string EndpointName = "Enrollment";
-
-    public static TBuilder AddEnrollmentProcessingEndpoint<TBuilder>(this TBuilder builder)
+    public static TBuilder AddEnrollmentProcessingEndpoints<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddSingleton<EnrollmentProcessor>();
+        builder.Services.AddSingleton<OrderProcessor>();
 
         var connectionString = builder.Configuration.GetConnectionString(MessagingTransport.ConnectionName);
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -23,12 +20,31 @@ public static class EnrollmentProcessing
             return builder;
         }
 
-        var endpoint = new EndpointConfiguration(EndpointName);
+        var enrollment = CreateEndpoint(QueueGate.EnrollmentEndpoint, connectionString, builder.Configuration);
+        enrollment.AddHandler<EnrollStudentHandler>();
+
+        var orders = CreateEndpoint(QueueGate.OrdersEndpoint, connectionString, builder.Configuration);
+        orders.AddHandler<WelcomeOrderHandler>();
+        orders.AddHandler<CreateWelcomeOrderHandler>();
+
+        builder.Services.AddNServiceBusEndpoint(enrollment, QueueGate.EnrollmentEndpoint);
+        builder.Services.AddNServiceBusEndpoint(orders, QueueGate.OrdersEndpoint);
+
+        return builder;
+    }
+
+    static EndpointConfiguration CreateEndpoint(string endpointName, string connectionString, IConfiguration configuration)
+    {
+        var endpoint = new EndpointConfiguration(endpointName);
+        endpoint.AssemblyScanner().Disable = true;
         endpoint.EnableInstallers();
         endpoint.UseSerialization<SystemJsonSerializer>();
-        endpoint.Conventions().DefiningCommandsAs(type => type == typeof(EnrollStudent));
-        var transport = CreateServiceBusTransport(connectionString);
-        // The emulator cannot enlist the audit send in the receive. A crash between send and
+        var conventions = endpoint.Conventions();
+        conventions.DefiningCommandsAs(MessageConventions.IsCommand);
+        conventions.DefiningEventsAs(MessageConventions.IsEvent);
+
+        var transport = MessagingTransport.Create(connectionString);
+        // ReceiveOnly keeps the SQL write out of the broker transaction. A crash between send and
         // complete can duplicate or lose a message. That matches the sample's no-outbox choice.
         transport.TransportTransactionMode = TransportTransactionMode.ReceiveOnly;
         endpoint.UseTransport(transport);
@@ -38,49 +54,11 @@ public static class EnrollmentProcessing
         endpoint.EnableMetrics().SendMetricDataToServiceControl(
             ServicePlatformQueues.Monitoring,
             TimeSpan.FromSeconds(10));
-
+        endpoint.Recoverability().AddUnrecoverableException<RoutedToErrorException>();
         endpoint.Pipeline.Register(
-            services => new StopProcessingBehavior(services.GetRequiredService<IFeatureManager>()),
-            "Hold messages while the StopProcessing flag is on");
+            _ => new QueueGateBehavior(endpointName, configuration),
+            $"Apply the queue gate for {endpointName}");
 
-        builder.Services.AddNServiceBusEndpoint(endpoint);
-
-        return builder;
-    }
-
-    static AzureServiceBusTransport CreateServiceBusTransport(string connectionString)
-    {
-        connectionString = NormalizeEmulatorConnectionString(connectionString);
-        if (connectionString.Contains("SharedAccessKey=", StringComparison.OrdinalIgnoreCase))
-        {
-            return new AzureServiceBusTransport(connectionString, TopicTopology.Default);
-        }
-
-        var fullyQualifiedNamespace = connectionString;
-        const string scheme = "sb://";
-        if (fullyQualifiedNamespace.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
-        {
-            fullyQualifiedNamespace = fullyQualifiedNamespace[scheme.Length..];
-        }
-
-        var slash = fullyQualifiedNamespace.IndexOf('/');
-        if (slash >= 0)
-        {
-            fullyQualifiedNamespace = fullyQualifiedNamespace[..slash];
-        }
-
-        return new AzureServiceBusTransport(fullyQualifiedNamespace, new DefaultAzureCredential(), TopicTopology.Default);
-    }
-
-    // NServiceBus only moves emulator administration to port 5300 when the endpoint has no port.
-    // Aspire publishes AMQP on 5672, which would otherwise send administration calls to the broker port.
-    static string NormalizeEmulatorConnectionString(string connectionString)
-    {
-        if (!connectionString.Contains("UseDevelopmentEmulator=true", StringComparison.OrdinalIgnoreCase))
-        {
-            return connectionString;
-        }
-
-        return connectionString.Replace(":5672;", ";", StringComparison.Ordinal);
+        return endpoint;
     }
 }

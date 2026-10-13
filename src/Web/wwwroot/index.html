@@ -12,7 +12,7 @@
       <p class="eyebrow">dotnet-minimalendpoint-nservicebus</p>
       <h1>API playground</h1>
     </div>
-    <p class="lede">This site is a separate Aspire service. It proxies <code>/api/*</code> to the API with service discovery. Enrollment is accepted immediately, then a NServiceBus handler finishes the work offline.</p>
+    <p class="lede">This site is a separate Aspire service. It proxies <code>/api/*</code> to the API with service discovery. Enrollment is accepted immediately. The Enrollment endpoint finishes the row. The Orders endpoint turns that completion event into a command, and the command writes the welcome order. <a class="flight-link" href="/control.html">Open flight control</a>.</p>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Playground">
@@ -20,6 +20,8 @@
     <button type="button" class="tab" role="tab" id="tab-ping" aria-controls="panel-ping" aria-selected="false" tabindex="-1">Ping</button>
     <button type="button" class="tab" role="tab" id="tab-enroll" aria-controls="panel-enroll" aria-selected="false" tabindex="-1">Enroll</button>
     <button type="button" class="tab" role="tab" id="tab-lookup" aria-controls="panel-lookup" aria-selected="false" tabindex="-1">Lookup</button>
+    <button type="button" class="tab" role="tab" id="tab-orders" aria-controls="panel-orders" aria-selected="false" tabindex="-1">Orders</button>
+    <button type="button" class="tab" role="tab" id="tab-processing" aria-controls="panel-processing" aria-selected="false" tabindex="-1">Processing</button>
     <button type="button" class="tab" role="tab" id="tab-todos" aria-controls="panel-todos" aria-selected="false" tabindex="-1">Todos</button>
   </nav>
 
@@ -107,6 +109,29 @@
       </form>
       <p id="lookup-empty" class="empty" hidden>No enrollments found.</p>
       <ul id="lookup-list" class="lookup-list"></ul>
+    </section>
+
+    <section id="panel-orders" class="card" role="tabpanel" aria-labelledby="tab-orders" hidden>
+      <div class="card-head">
+        <h2 id="orders-heading">Orders</h2>
+        <code>GET /api/orders</code>
+      </div>
+      <p class="meta-line">A completed enrollment publishes <code>EnrollmentCompletedEvent</code>. That handler only sends <code>CreateWelcomeOrderCommand</code>. The command handler writes one welcome order for that tracking id.</p>
+      <p id="orders-empty" class="empty" hidden>No orders yet.</p>
+      <ul id="orders-list" class="lookup-list"></ul>
+      <div class="actions">
+        <button type="button" id="orders-refresh" class="secondary">Refresh</button>
+      </div>
+    </section>
+
+    <section id="panel-processing" class="card" role="tabpanel" aria-labelledby="tab-processing" hidden>
+      <div class="card-head">
+        <h2 id="processing-heading">Processing</h2>
+        <code>GET PUT /api/processing</code>
+      </div>
+      <p class="meta-line">Pause holds commands. The handler does not run, and the command is sent back to the same endpoint in 30 seconds. Events keep processing. Pausing the enroll command delays the welcome-order command. Pausing “Write welcome order” holds the SQL write after the event has been handled. Route to error still applies to commands and events, with no retries.</p>
+      <p id="processing-note" class="meta-line">Loading queue gates…</p>
+      <div id="gate-list"></div>
     </section>
 
     <section id="panel-todos" class="card" role="tabpanel" aria-labelledby="tab-todos" hidden>

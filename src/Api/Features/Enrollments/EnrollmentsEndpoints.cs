@@ -36,7 +36,7 @@ public sealed class EnrollmentsEndpoints : IEndpoint
         }
 
         var trackingId = Guid.NewGuid();
-        await sender.SendAsync(new EnrollStudent
+        await sender.SendAsync(new EnrollStudentCommand
         {
             TrackingId = trackingId,
             Name = request.Name!.Trim(),
@@ -99,7 +99,7 @@ public sealed class EnrollmentsEndpoints : IEndpoint
 
 public interface IEnrollmentSender
 {
-    Task SendAsync(EnrollStudent message, bool delay, CancellationToken cancellationToken);
+    Task SendAsync(EnrollStudentCommand message, bool delay, CancellationToken cancellationToken);
 }
 
 public sealed record EnrollRequest(string? Name, string? Email, string? Program, string? Processing);

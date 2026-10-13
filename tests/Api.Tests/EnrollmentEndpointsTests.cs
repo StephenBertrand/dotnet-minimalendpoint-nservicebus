@@ -171,9 +171,9 @@ public sealed class EnrollmentApiFactory : WebApplicationFactory<Program>
 
 public sealed class CapturingEnrollmentSender : IEnrollmentSender
 {
-    public List<(EnrollStudent Message, bool Delay)> Sent { get; } = [];
+    public List<(EnrollStudentCommand Message, bool Delay)> Sent { get; } = [];
 
-    public Task SendAsync(EnrollStudent message, bool delay, CancellationToken cancellationToken)
+    public Task SendAsync(EnrollStudentCommand message, bool delay, CancellationToken cancellationToken)
     {
         Sent.Add((message, delay));
         return Task.CompletedTask;

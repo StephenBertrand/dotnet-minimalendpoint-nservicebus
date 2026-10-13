@@ -1,6 +1,6 @@
 namespace Enrollment;
 
-public sealed class EnrollStudent
+public sealed class EnrollStudentCommand
 {
     public Guid TrackingId { get; set; }
 

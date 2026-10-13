@@ -8,8 +8,17 @@ internal static class AppConfigurationEmulatorSeeder
     private const string ApiVersion = "2023-11-01";
     private const string FeatureFlagContentType = "application/vnd.microsoft.appconfig.ff+json;charset=utf-8";
     private const string HelloNewWorldFlag = "HelloNewWorld";
-    private const string StopProcessingFlag = "StopProcessing";
     private const string SentinelKey = "Demo:Sentinel";
+
+    // Same keys as Enrollment.QueueGate. Seeded only when missing, so a pause survives a restart.
+    private static readonly string[] ProcessingKeys =
+    [
+        "Demo:Processing:Enrollment",
+        "Demo:Processing:Enrollment:EnrollStudentCommand",
+        "Demo:Processing:Orders",
+        "Demo:Processing:Orders:EnrollmentCompletedEvent",
+        "Demo:Processing:Orders:CreateWelcomeOrderCommand"
+    ];
 
     public static async Task SeedIfMissingAsync(AzureAppConfigurationResource resource, CancellationToken cancellationToken)
     {
@@ -33,12 +42,10 @@ internal static class AppConfigurationEmulatorSeeder
             """{"id":"HelloNewWorld","description":"When enabled, GET /hello returns Hello New World.","enabled":false,"conditions":{"client_filters":[]}}""",
             cancellationToken);
 
-        await PutIfMissingAsync(
-            client,
-            $".appconfig.featureflag/{StopProcessingFlag}",
-            FeatureFlagContentType,
-            """{"id":"StopProcessing","description":"When enabled, the enrollment endpoint holds messages and retries them in 30 seconds. Handlers do not run, and nothing is moved to the error queue.","enabled":false,"conditions":{"client_filters":[]}}""",
-            cancellationToken);
+        foreach (var key in ProcessingKeys)
+        {
+            await PutIfMissingAsync(client, key, contentType: null, value: "running", cancellationToken);
+        }
 
         await PutIfMissingAsync(
             client,
